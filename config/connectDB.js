@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 dotenv.config();
 
-const dbUrl = process.env.DB_URI || '';
+const dbUrl = process.env.DB_URI + '?maxPoolSize=50&serverSelectionTimeoutMS=5000';
 
 const connectDB = async () => {
 
@@ -16,6 +16,7 @@ const connectDB = async () => {
 
     await mongoose.connect(dbUrl, {
       dbName: 'RadheShyamExch',
+      readPreference: 'primary',
     });
 
     console.log('✅ MongoDB connected');

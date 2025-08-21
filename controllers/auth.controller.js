@@ -1,7 +1,7 @@
 // controllers/auth.controller.js
-const User = require('../models/user');
+const User = require('../db/models/user');
 const jwt = require('jsonwebtoken');
-const Admin = require('../models/admin');
+const Admin = require('../db/models/admin');
 const dotenv = require('dotenv');
 dotenv.config();
 
@@ -28,7 +28,7 @@ exports.login = async (req, res) => {
         );
 
         console.log(existingUser);
-        res.status(201).json({ message: 'User logged In', success: true, token, balance:existingUser.balance });
+        res.status(201).json({ message: 'User logged In', success: true, token, balance: existingUser.balance });
 
     } catch (err) {
         console.log(err);
@@ -100,3 +100,4 @@ exports.adminSignUp = async (req, res) => {
         return res.status(400).json({ message: error.message, success: false });
     }
 }
+

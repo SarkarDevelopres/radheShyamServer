@@ -1,6 +1,6 @@
-const User = require('../models/user');
-const Bet = require('../models/bet');
-const Transaction = require('../models/transaction');
+const User = require('../db/models/user');
+const Bet = require('../db/models/bet');
+const Transaction = require('../db/models/transaction');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 dotenv.config();
