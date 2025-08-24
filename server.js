@@ -21,6 +21,7 @@ const authRouter = require('./routes/auth.routes');
 const oddsRouter = require('./routes/odds.routes');
 const dataRouter = require('./routes/data.routes');
 const betsRouter = require('./routes/bets.routes');
+const adminRouter = require('./routes/admin.routes');
 
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -30,6 +31,7 @@ app.get('/', (_req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/odds', oddsRouter);
 app.use('/api/data', dataRouter);
+app.use('/api/admin', adminRouter);
 
 // Protected routes
 app.use('/api/bets', authenticateUser, betsRouter);

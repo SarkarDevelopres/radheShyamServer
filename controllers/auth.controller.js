@@ -60,16 +60,19 @@ exports.adminLogin = async (req, res) => {
     try {
         const { email, password } = req.body;
 
+        console.log(email, password);
+        
+
         let exisitingAdmin = await User.findOne({ "email": email }).select('password');
 
         console.log(exisitingAdmin);
 
         if (!exisitingAdmin) {
-            return res.status(400).json({ error: 'Invalid Credentials', success: false });
+            return res.status(400).json({ message: 'Invalid Credentials', success: false });
         }
 
         if (exisitingAdmin.password != password) {
-            return res.status(400).json({ error: 'Invalid Credentials', success: false });
+            return res.status(400).json({ message: 'Invalid Credentials', success: false });
         }
         const token = jwt.sign(
             { adminID: exisitingAdmin._id }, // payload
