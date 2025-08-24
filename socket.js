@@ -1,9 +1,10 @@
 // socket.js
 const { Server } = require("socket.io");
-const { placeBetTx } = require("./db/store");
+const { placeBetTx, fetchBalance } = require("./db/store");
 const { initSevenUpDown } = require("./games/sevenUpDown");
 const { initHighLow } = require("./games/highlow");
 const { initAAA } = require("./games/aaa");
+const { initDragonTiger } = require("./games/dragontiger");
 
 function canonGameName(g) {
   if (!g) return "";
@@ -27,19 +28,23 @@ function attachSocket(server) {
   });
 
   // --- Start game engines ---
-  const seven = initSevenUpDown(io, "table-1"); // engine roomKey: SEVEN_UP_DOWN:table-1
-  const highlow = initHighLow(io, "default");
-
-  const aaa = initAAA(io, "default");
+  // const seven = initSevenUpDown(io, "table-1"); 
+  // const highlow = initHighLow(io, "default");
+  // const aaa = initAAA(io, "default");
+  const dragontiger = initDragonTiger(io, "default");
 
   // Registry so we can fetch engine by roomKey on join
   const engines = {
-    ["SEVEN_UP_DOWN:table-1"]: seven,
-    ["HIGH_LOW:default"]: highlow,
-    ["AMAR_AKBAR_ANTHONY:default"]: aaa,
+    // ["SEVEN_UP_DOWN:table-1"]: seven,
+    // ["HIGH_LOW:default"]: highlow,
+    // ["AMAR_AKBAR_ANTHONY:default"]: aaa,
+    ["DRAGON_TIGER:default"]: dragontiger,
   };
 
   io.on("connection", (socket) => {
+    socket.onAny((event, ...args) => {
+      // console.log("[socket] IN:", event, args[0]);
+    });
     // Join a game/table room to get lifecycle events
     socket.on("join", ({ game, tableId }) => {
       const canon = canonGameName(game);
@@ -55,6 +60,19 @@ function attachSocket(server) {
         socket.emit("round:start", engine.publicRound() || {});
       } else {
         socket.emit("round:start", {}); // empty starter payload
+      }
+    });
+
+    socket.on("wallet:fetch", async ({ userId }, cb) => {
+      try {
+        const data = await fetchBalance(userId);
+        // e.g. { balance: number }
+        console.log("DATA: ",data);
+        
+        cb?.({ ok: true, ...data });
+      } catch (e) {
+        console.error("[wallet:fetch] error:", e);
+        cb?.({ ok: false, error: e?.message || "Failed to fetch balance" });
       }
     });
 

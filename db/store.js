@@ -4,12 +4,47 @@ const Bet = require('./models/bet');
 const Round = require('./models/round');
 const Transaction = require('./models/transaction'); // optional but recommended
 const mongoose = require('mongoose');
-const SevenODDS = { UP: 1.9, DOWN: 1.9, SEVEN: 12 };
-const AAAODDS = {
-  AMAR: 3.0,
-  AKBAR: 3.0,
-  ANTHONY: 3.0,
+const SevenODDS = {
+  UP: 1.9,
+  DOWN: 1.9,
+  SEVEN: 12,
+  RED: 1.9,
+  BLACK: 1.9,
+  HEARTS: 4,
+  DIAMONDS: 3.9,
+  CLUBS: 3.9,
+  SPADES: 3.9,
+  // Optional: Exact card guess (if you ever add that)
+  // "7_of_hearts": 50,
 };
+
+const AAAODDS = {
+  AMAR: 2.1,
+  AKBAR: 3.2,
+  ANTHONY: 4.2,
+  RED: 1.9,
+  BLACK: 1.9,
+  HEARTS: 3.9,
+  DIAMONDS: 3.9,
+  CLUBS: 3.9,
+  SPADES: 3.9,
+};
+
+// HIGH_LOW game
+const HLODDS = {
+  HIGH: 1.9,      // 24/51 ≈ 47.06% win → ~10.6% house edge at 1.9
+  LOW: 1.9,       // same as HIGH
+  TIE: 16,       // tie (same rank), 3/51 ≈ 5.88% → ~5.9% edge
+
+  RED: 1.9,       // ≈50% → ~5% edge
+  BLACK: 1.9,     // ≈50% → ~5% edge
+
+  HEARTS: 3.9,    // ≈25% → ~2.5% edge
+  DIAMONDS: 3.9,  // ≈25% → ~2.5% edge
+  CLUBS: 3.9,     // ≈25% → ~2.5% edge
+  SPADES: 3.9     // ≈25% → ~2.5% edge
+};
+
 
 // ---------- helpers ----------
 const normalize = (v) => (typeof v === 'string' ? v.trim().toUpperCase() : v);
@@ -50,6 +85,13 @@ async function lockBetsForRound(roundId) {
   );
 }
 
+
+async function fetchBalance(userId){
+  console.log("USERID: ",userId);
+  
+  const u = await User.findById(userId).select("balance");
+    return u;
+}
 // ---------- casino bet placement (socket flow) ----------
 async function placeBetTx({ userId, game, tableId, roundId, market, stake }) {
   const session = await mongoose.startSession();
@@ -161,7 +203,7 @@ async function placeSportsBetTx({ userId, eventId, market, selection, stake, odd
 }
 
 // ---------- casino settlement (called by engine hook) ----------
-async function settleRoundTx({ roundId, game, outcome, meta = {} }) {
+async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
   const session = await mongoose.startSession();
   try {
     session.startTransaction();
@@ -174,7 +216,10 @@ async function settleRoundTx({ roundId, game, outcome, meta = {} }) {
     }
 
     const canonGame = normalize(game);
-    const canonOutcome = normalize(outcome);
+    const canonOutcome = outcome.card;
+    const canonFirstOutcome = normalize(outcome.firstOutcome);
+    const canonGroupOutcome = normalize(outcome.group);
+    const canonSuitOutcome = normalize(outcome.suit);
 
     // 2) Load all unsettled casino bets for this round
     const bets = await Bet.find({ roundId, settled: { $ne: true }, type: 'casino' }).session(session);
@@ -182,6 +227,7 @@ async function settleRoundTx({ roundId, game, outcome, meta = {} }) {
     // 3) Decide winners / payouts
     const betUpdates = [];
     const walletIncs = []; // bulk ops for User
+    const txDocs = [];
     let totalPayout = 0;
     let winners = 0;
     let losers = 0;
@@ -190,8 +236,8 @@ async function settleRoundTx({ roundId, game, outcome, meta = {} }) {
     if (canonGame === 'SEVEN_UP_DOWN') {
       for (const b of bets) {
         const pick = normalize(b.market);
-        const won = pick === canonOutcome;
-        const odd = won ? (SevenODDS[canonOutcome] || 0) : 0;
+        const won = pick === canonFirstOutcome || pick === canonGroupOutcome || pick == canonSuitOutcome;
+        const odd = won ? (SevenODDS[pick] || 0) : 0;
         const payout = won ? Math.round(Number(b.stake) * Number(odd)) : 0;
 
         betUpdates.push({
@@ -203,7 +249,7 @@ async function settleRoundTx({ roundId, game, outcome, meta = {} }) {
                 status: won ? 'WON' : 'LOST',
                 won,
                 payout,
-                outcome: canonOutcome,
+                outcome: pick,
                 meta,
                 settledAt: new Date(),
               },
@@ -218,8 +264,17 @@ async function settleRoundTx({ roundId, game, outcome, meta = {} }) {
               update: { $inc: { balance: Number(payout) } },
             },
           });
+          txDocs.push({
+            userId: b.userId,
+            type: 'bet_win',
+            amount: payout,
+            // balanceAfter: (optional; see note below)
+            meta: { betId: b._id, roundId, game: canonGame, market: pick, outcome: canonOutcome }
+          });
           totalPayout += payout;
           winners++;
+
+
         } else {
           losers++;
         }
@@ -227,29 +282,33 @@ async function settleRoundTx({ roundId, game, outcome, meta = {} }) {
     } else if (canonGame === 'HIGH_LOW') {
       const tiePush = meta.tiePush !== false;
       const marketWins = canonOutcome === 'HIGH' ? 'high' : canonOutcome === 'LOW' ? 'low' : null;
-      const HL_ODDS = { high: 1.9, low: 1.9 };
+      const roundOdds = odds
+      // console.log("ODDS: ",odds);
+      
 
       for (const b of bets) {
-        const pick = String(b.market || '').toLowerCase();
-        let status = 'LOST';
-        let won = false;
-        let payout = 0;
+        const pick = normalize(b.market);
+        console.log("PICK :",pick);
+        
+        let won = pick === canonFirstOutcome || pick === canonGroupOutcome || pick == canonSuitOutcome;
+        let status = won?'WIN':'LOST';
+        let payout = won ? Math.round(Number(b.stake) * Number(roundOdds[pick] || 0)) : 0;
 
-        if (canonOutcome === 'TIE') {
-          if (tiePush) {
-            payout = Number(b.stake); // refund stake
-            status = 'PUSH';
-          } else {
-            payout = 0;
-            status = 'LOST';
-          }
-        } else {
-          won = pick === marketWins;
-          if (won) {
-            payout = Math.round(Number(b.stake) * Number(HL_ODDS[pick] || 0));
-            status = 'WON';
-          }
-        }
+        // if (canonOutcome === 'TIE') {
+        //   if (tiePush) {
+        //     payout = Number(b.stake); // refund stake
+        //     status = 'PUSH';
+        //   } else {
+        //     payout = 0;
+        //     status = 'LOST';
+        //   }
+        // } else {
+        //   won = pick === marketWins;
+        //   if (won) {
+        //     payout = Math.round(Number(b.stake) * Number(HLODDS[pick] || 0));
+        //     status = 'WON';
+        //   }
+        // }
 
         betUpdates.push({
           updateOne: {
@@ -275,6 +334,13 @@ async function settleRoundTx({ roundId, game, outcome, meta = {} }) {
               update: { $inc: { balance: Number(payout) } },
             },
           });
+          txDocs.push({
+            userId: b.userId,
+            type: 'payout_win',
+            amount: payout,
+            balanceAfter: payout,
+            meta: { betId: b._id, roundId, game: canonGame, market: pick, outcome: canonOutcome }
+          });
           totalPayout += payout;
           if (status === 'PUSH') pushes++; else winners++;
         } else if (status === 'PUSH') {
@@ -287,10 +353,16 @@ async function settleRoundTx({ roundId, game, outcome, meta = {} }) {
     else if (canonGame === "AMAR_AKBAR_ANTHONY") {
       for (const b of bets) {
         const pick = normalize(b.market);                 // "AMAR" | "AKBAR" | "ANTHONY"
-        const won = pick === canonOutcome;
+        console.log("Pick: ",pick);
+        console.log("Outcome: ",canonFirstOutcome);
+        console.log("Group: ",canonGroupOutcome);
+        console.log("Suit: ",canonSuitOutcome);
+        
+        const won = pick === canonFirstOutcome || pick === canonGroupOutcome || pick == canonSuitOutcome;
+        const odd = won ? (AAAODDS[pick] || 0) : 0;
 
-        // Use AAA odds mapping
-        const odd = won ? Number(AAAODDS[canonOutcome] || 0) : 0;
+        console.log("Won Result: ",won);
+        
 
         // Full payout = stake * odd (adjust if you deduct commission elsewhere)
         const payout = won ? Math.round(Number(b.stake) * odd) : 0;
@@ -319,6 +391,13 @@ async function settleRoundTx({ roundId, game, outcome, meta = {} }) {
               update: { $inc: { balance: Number(payout) } },
             },
           });
+          txDocs.push({
+            userId: b.userId,
+            type: 'payout_win',
+            amount: payout,
+            balanceAfter: payout,
+            meta: { betId: b._id, roundId, game: canonGame, market: pick, outcome: canonOutcome }
+          });
           totalPayout += payout;
           winners++;
         } else {
@@ -334,9 +413,13 @@ async function settleRoundTx({ roundId, game, outcome, meta = {} }) {
     if (betUpdates.length) {
       await Bet.bulkWrite(betUpdates, { session, ordered: false });
     }
+    console.log(walletIncs);
     if (walletIncs.length) {
       await User.bulkWrite(walletIncs, { session, ordered: false });
     }
+    console.log("Trans Doc: ",txDocs);
+    
+    if (txDocs.length) await Transaction.insertMany(txDocs, { session });
 
     // 5) Mark round settled + store outcome/meta/summary
     round.status = 'SETTLED';          // canonical round phase
@@ -367,6 +450,7 @@ async function settleRoundTx({ roundId, game, outcome, meta = {} }) {
 
 
 module.exports = {
+  fetchBalance,
   createRound,
   lockRound,
   placeBetTx,        // casino

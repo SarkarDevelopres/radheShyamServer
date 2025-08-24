@@ -2,8 +2,8 @@
 const { RoundEngine } = require('./engine');
 const { createRound, lockRound, settleRoundTx } = require('../db/store');
 
-const RANKS = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
-const SUITS = ["hearts","diamonds","clubs","spades"]; // 0..3
+const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+const SUITS = ["hearts", "diamonds", "clubs", "spades"]; // 0..3
 
 function makeDeck() {
   const deck = [];
@@ -17,16 +17,29 @@ function chooseRandomCard() {
   return deck[idx];
 }
 
-/**
- * Map a card to one of the 3 boxes with (near) perfectly even distribution.
- * outcome ∈ {"AMAR","AKBAR","ANTHONY"}
- */
-function resolveOutcome(card) {
-  const rIdx = RANKS.indexOf(String(card.rank).toUpperCase());   // 0..12
-  const sIdx = SUITS.indexOf(String(card.suit).toLowerCase());   // 0..3
-  const bucket = (rIdx + sIdx) % 3;
-  return bucket === 0 ? "AMAR" : bucket === 1 ? "AKBAR" : "ANTHONY";
+function resolveOutcome() {
+  let card = chooseRandomCard();
+  let amar = false, akbar = false, anthony = false, group = "red", suit = card.suit;
+  const rank = card.rank;
+  let rankValue = 0;
+  if (rank === "A") rankValue = 1;
+  else if (rank === "J") rankValue = 11;
+  else if (rank === "Q") rankValue = 12;
+  else if (rank === "K") rankValue = 13;
+  else rankValue = parseInt(rank);
+
+  // high, low, or seven
+  if (rankValue < 7) amar = true;
+  else if (rankValue => 7 && rankValue < 11) akbar = true;
+  else anthony = true;
+
+  //  red or black group
+  if (suit === "hearts" || suit === "diamonds") group = "red";
+  else group = "black";
+
+  return { amar, akbar, anthony, group, suit, card };
 }
+
 
 /**
  * If you prefer a simple suit-based mapping instead (less uniform), you can do:
@@ -57,26 +70,21 @@ function initAAA(io, tableId = 'table-1') {
       onLock: async (roundId) => { await lockRound(roundId); },
 
       // Compute result once; engine will emit exactly this object
-      onComputeResult: () => {
-        const card = chooseRandomCard();
-        const outcome = resolveOutcome(card);
-        // This exact payload is what clients see and what onSettle receives
-        return { outcome, card }; 
-      },
+      onComputeResult: () => resolveOutcome(),
 
       // Persist settlement using the SAME result emitted above
       onSettle: async (roundId, result) => {
         // result is { outcome, card } from onComputeResult
-        const payload = result || (() => {
-          const c = chooseRandomCard();
-          return { outcome: resolveOutcome(c), card: c };
-        })();
-
+        const { amar, akbar, anthony, group, suit, card } = result || resolveOutcome();
+        let firstOutcome = "AMAR";
+        if (amar) firstOutcome = "AMAR";
+        else if (akbar) firstOutcome = "AKBAR";
+        else if (anthony) firstOutcome = "ANTHONY";
         await settleRoundTx({
           roundId,
           game: GAME,
-          outcome: payload.outcome,    // "AMAR" | "AKBAR" | "ANTHONY"
-          meta: { card: payload.card } // keep full card in meta
+          outcome: { firstOutcome, group, suit, card },    // "AMAR" | "AKBAR" | "ANTHONY"
+          meta: {  amar, akbar, anthony, group, suit, card} // keep full card in meta
         });
       },
 

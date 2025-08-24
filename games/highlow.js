@@ -11,7 +11,7 @@ const SUITS = ["hearts", "diamonds", "clubs", "spades"];
 
 // Configure rules here:
 const ACE_HIGH = true;  // If true, Ace = 14; else Ace = 1
-const TIE_PUSH = true;  // If true, tie = push/refund (winMarket = null)
+const TIE_PUSH = false;  // If true, tie = push/refund (winMarket = null)
 
 function rankValue(rank) {
   const r = String(rank).toUpperCase();
@@ -28,7 +28,7 @@ function makeDeck() {
     for (const r of RANKS) deck.push({ rank: r, suit: s });
   }
   // console.log(deck);
-  
+
   return deck;
 }
 
@@ -52,19 +52,64 @@ function compareCards(baseCard, nextCard) {
   return "TIE";
 }
 
+function getDynamicHighLowOdds(baseCard, margin = 0.06) {
+  const v = rankValue(baseCard.rank);
+  const cardsHigher = 4 * (14 - v);
+  const cardsLower = 4 * (v - 2);
+  const cardsTie = 3;
+  const live = cardsHigher + cardsLower;
+
+  const probHigh = cardsHigher / live;
+  const probLow = cardsLower / live;
+  const probTie = cardsTie / 51;
+
+  const roundOdds = (p) => ((1 - margin) / p);
+
+  const odds = {
+    HIGH: Math.min(12, roundOdds(probHigh)),
+    LOW: Math.max(1.01, roundOdds(probLow)),
+    TIE: Math.min(50, roundOdds(probTie)),
+    RED: 1.9,
+    BLACK: 1.9,
+    HEARTS: 3.9,
+    DIAMONDS: 3.9,
+    CLUBS: 3.9,
+    SPADES: 3.9
+  };
+
+  // Round to 2 decimal places
+  for (let k in odds) {
+    odds[k] = Math.round(odds[k] * 100) / 100;
+  }
+
+  return odds;
+}
+
+
 /**
  * Produce per-round result we’ll store & emit.
  * We pre-select both cards at LOCK so base is fixed before settle.
  */
 function rngHighLow() {
   const { baseCard, nextCard } = drawTwoCardsNoReplace();
-  const outcome = compareCards(baseCard, nextCard); // 'HIGH' | 'LOW' | 'TIE'
-  let winMarket = null; // 'high' | 'low' | null (push)
-  if (outcome === "HIGH") winMarket = "high";
-  else if (outcome === "LOW") winMarket = "low";
-  else winMarket = null; // 'TIE' → push if TIE_PUSH
-  return { baseCard, nextCard, outcome, winMarket };
+
+  let suit = nextCard.suit;
+  let group = "red";
+  if (suit === "hearts" || suit === "diamonds") group = "red";
+  else group = "black";
+
+  const firstOutcome = compareCards(baseCard, nextCard); // 'HIGH' | 'LOW' | 'TIE'
+  const odds = getDynamicHighLowOdds(baseCard);          // NEW: inject odds
+
+  let finalOutcome = { firstOutcome, suit, group, baseCard, nextCard };
+  let winMarket = null;
+  if (firstOutcome === "HIGH") winMarket = "high";
+  else if (firstOutcome === "LOW") winMarket = "low";
+  else winMarket = null;
+
+  return { baseCard, nextCard, outcome: finalOutcome, winMarket, odds };  // RETURN odds
 }
+
 
 /** ===========================================================
  *  High–Low init — non-blocking hooks + explicit reveal
@@ -91,7 +136,7 @@ function initHighLow(io, tableId = "default") {
        */
       decorateSnapshot: (snap) => {
         console.log("Decorate Snap called");
-        
+
         const rid = snap.id;                      // engine.publicRound() uses 'id'
         const res = rid && prepared.get(rid);
         return res ? { ...snap, baseCard: res.baseCard } : snap;
@@ -108,9 +153,11 @@ function initHighLow(io, tableId = "default") {
 
         // 2) PREPARE the full outcome ONCE for this round
         let res = prepared.get(roundId);
+        // console.log("OUTCOME: ",!res);
+
         if (!res) {
           res = rngHighLow();                          // { baseCard, nextCard, outcome, winMarket }
-          console.log("Result: ", res);
+          // console.log("NEWOUTCOME: ",res);
 
           prepared.set(roundId, res);
         }
@@ -149,16 +196,20 @@ function initHighLow(io, tableId = "default") {
           roundId,
           baseCard: res.baseCard,  // optional
           nextCard: res.nextCard,
-          outcome: res.outcome,    // 'HIGH'|'LOW'|'TIE'
+          odds: res.odds,
+          outcome: res.outcome.firstOutcome,    // 'HIGH'|'LOW'|'TIE'
         };
       },
 
       onSettle: async (roundId, result) => {
+        console.log("RESULT: ", result);
+
         const res = prepared.get(roundId) || result;
         await settleRoundTx({
           roundId,
           game: GAME,
           outcome: res.outcome,
+          odds: res.odds,
           meta: {
             baseCard: res.baseCard,
             nextCard: res.nextCard,

@@ -202,13 +202,13 @@ class RoundEngine {
       this._resultT = setTimeout(() => this.resultIfCurrent(nonce).catch(console.error), rem);
       return;
     }
-    
+
     this._resultEmitted = true;
-    
-    console.log(`Result Called @ ${new Date().toISOString()} (expected ~${new Date(this._resultAt).toISOString()})`);
-    
+
+    // console.log(`Result Called @ ${new Date().toISOString()} (expected ~${new Date(this._resultAt).toISOString()})`);
+
     let result = null;
-    
+
     if (this.hooks.onComputeResult) {
       // Preferred: pure, synchronous RNG (no DB)
       try {
@@ -217,6 +217,7 @@ class RoundEngine {
         console.error(`[engine ${this.roomKey()}] onComputeResult error:`, err);
       }
 
+      // console.log("Result Is: ", result);
       // Emit RESULT immediately
       this.io.to(this.roomKey()).emit('round:result', {
         roundId: this.round?._id || null,
@@ -228,7 +229,12 @@ class RoundEngine {
       // Persist settlement asynchronously using the SAME result
       if (this.hooks.onSettle && this.round?._id) {
         Promise.resolve()
-          .then(() => this.hooks.onSettle(this.round._id, result))
+          .then(() => {
+            this.hooks.onSettle(this.round._id, result);
+            this.io.to(this.roomKey()).emit("wallet:fetch", {
+              roundId: this.round._id,
+            });
+          })
           .catch(err => console.error(`[engine ${this.roomKey()}] onSettle error:`, err));
       }
 
@@ -237,6 +243,7 @@ class RoundEngine {
       Promise.resolve()
         .then(() => this.hooks.onSettle(this.round._id))
         .then((res) => {
+
           this.io.to(this.roomKey()).emit('round:result', {
             roundId: this.round?._id || null,
             game: this.game,
