@@ -178,6 +178,7 @@ class RoundEngine {
 
     // local state + emit ASAP
     if (this.round) this.round.status = 'LOCKED';
+    
     this.io.to(this.roomKey()).emit('round:lock', {
       roundId: this.round?._id || null,
       game: this.game,
@@ -217,7 +218,7 @@ class RoundEngine {
         console.error(`[engine ${this.roomKey()}] onComputeResult error:`, err);
       }
 
-      // console.log("Result Is: ", result);
+      console.log("Result Is: ", result);
       // Emit RESULT immediately
       this.io.to(this.roomKey()).emit('round:result', {
         roundId: this.round?._id || null,

@@ -10,12 +10,18 @@ const DRAGON_TIGER_ODDS = {
   DRAGON: 2.04,
   TIGER: 2.04,
   TIE: 12.2,
-  RED: 1.9,
-  BLACK: 1.9,
-  HEARTS: 3.9,
-  DIAMONDS: 3.9,
-  CLUBS: 3.9,
-  SPADES: 3.9,
+  DRAGON_RED: 1.9,
+  DRAGON_BLACK: 1.9,
+  DRAGON_HEARTS: 3.9,
+  DRAGON_CLUBS: 3.9,
+  DRAGON_SPADES: 3.9,
+  DRAGON_DIAMONDS: 3.9,
+  TIGER_RED: 1.9,
+  TIGER_BLACK: 1.9,
+  TIGER_DIAMONDS: 3.9,
+  TIGER_HEARTS: 3.9,
+  TIGER_CLUBS: 3.9,
+  TIGER_SPADES: 3.9,
 };
 
 function drawCard() {
@@ -39,8 +45,10 @@ function rngDragonTiger() {
 
   const outcome = {
     result: winner,   // DRAGON | TIGER | TIE
+    dragonRank: dragon.rank,
     dragonSuit: dragon.suit,
     dragonGroup: dragon.group,
+    tigerRank: dragon.rank,
     tigerSuit: tiger.suit,
     tigerGroup: tiger.group,
   };
@@ -110,6 +118,10 @@ function initDragonTiger(io, tableId = "default") {
 
       onSettle: async (roundId, result) => {
         const res = prepared.get(roundId) || result;
+        // console.log("CAME RESULTS: ",result);
+        // console.log("Stored RESULTS: ",prepared.get(roundId));
+        // console.log("REAL RESULTS: ",res);
+        
         await settleRoundTx({
           roundId,
           game: GAME,

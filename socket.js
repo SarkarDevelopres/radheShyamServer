@@ -21,23 +21,23 @@ function canonGameName(g) {
 function attachSocket(server) {
   const io = new Server(server, {
     cors: {
-      origin: ["http://localhost:3000"], // add frontend origins as needed
+       origin: ["http://localhost:3000", "https://radheshyamexch.com","https://www.eradheshyamexch.com"], // add frontend origins as needed
       methods: ["GET", "POST"],
       credentials: true,
     },
   });
 
   // --- Start game engines ---
-  // const seven = initSevenUpDown(io, "table-1"); 
-  // const highlow = initHighLow(io, "default");
-  // const aaa = initAAA(io, "default");
+  const seven = initSevenUpDown(io, "table-1"); 
+  const highlow = initHighLow(io, "default");
+  const aaa = initAAA(io, "default");
   const dragontiger = initDragonTiger(io, "default");
 
   // Registry so we can fetch engine by roomKey on join
   const engines = {
-    // ["SEVEN_UP_DOWN:table-1"]: seven,
-    // ["HIGH_LOW:default"]: highlow,
-    // ["AMAR_AKBAR_ANTHONY:default"]: aaa,
+    ["SEVEN_UP_DOWN:table-1"]: seven,
+    ["HIGH_LOW:default"]: highlow,
+    ["AMAR_AKBAR_ANTHONY:default"]: aaa,
     ["DRAGON_TIGER:default"]: dragontiger,
   };
 
