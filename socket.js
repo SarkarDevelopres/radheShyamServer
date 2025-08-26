@@ -6,6 +6,8 @@ const { initHighLow } = require("./games/highlow");
 const { initAAA } = require("./games/aaa");
 const { initDragonTiger } = require("./games/dragontiger");
 const jwt = require('jsonwebtoken');
+
+let ioInstance = null;
 function canonGameName(g) {
   if (!g) return "";
   const s = String(g).toLowerCase().replace(/[\s\-]/g, "_");
@@ -26,6 +28,8 @@ function attachSocket(server) {
       credentials: true,
     },
   });
+
+  ioInstance = io;
 
   // --- Start game engines ---
   const seven = initSevenUpDown(io, "table-1");
@@ -142,4 +146,11 @@ function attachSocket(server) {
   return io;
 }
 
-module.exports = { attachSocket };
+
+
+function getIO() {
+  if (!ioInstance) throw new Error("Socket.io not initialized yet");
+  return ioInstance;
+}
+
+module.exports = { attachSocket, getIO };

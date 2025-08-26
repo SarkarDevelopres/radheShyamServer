@@ -230,7 +230,7 @@ class RoundEngine {
       });
 
 
-      console.log("ROUND ID: ", result);
+      // console.log("ROUND ID: ", result);
 
 
       // Persist settlement asynchronously using the SAME result

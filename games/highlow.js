@@ -107,7 +107,7 @@ function rngHighLow() {
   else if (firstOutcome === "LOW") winMarket = "low";
   else winMarket = null;
 
-  console.log(nextCard);
+  // console.log(nextCard);
   
 
   return { baseCard, nextCard, outcome: finalOutcome, winMarket, odds };  // RETURN odds

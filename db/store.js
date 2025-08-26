@@ -150,7 +150,7 @@ async function placeBetTx({ userId, game, tableId, roundId, market, stake }) {
 }
 
 // ---------- sports bet placement (HTTP route) ----------
-async function placeSportsBetTx({ userId, eventId, market, selection, stake, odds, bookmakerKey }) {
+async function placeSportsBetTx({ userId, eventId, market,selection, stake, odds }) {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
@@ -172,7 +172,6 @@ async function placeSportsBetTx({ userId, eventId, market, selection, stake, odd
         selection,
         stake,
         odds,
-        bookmakerKey,
         status: 'OPEN',
         potentialPayout,
       }],

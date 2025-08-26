@@ -3,43 +3,46 @@ const Bet = require('../db/models/bet');
 const Transaction = require('../db/models/transaction');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
+const { placeSportsBetTx, fetchBalance } = require('../db/store')
 dotenv.config();
+const { getIO } = require('../socket');
 
-exports.placeBets = async(req,res) => {
-    // POST /bets/place
-// body: { matchId, selection, stake, odds, bookmakerKey }
+exports.placeBets = async (req, res) => {
+  // POST /bets/place
+  // body: { matchId, selection, stake, odds, bookmakerKey }
 
-  const { token, matchId, selection, stake, odds } = req.body;
-  const decoded = jwt.verify(token,process.env.JWT_SECRET);
+  const { token, matchId, market, bookmakerKey, selection, stake, odds } = req.body;
+  const decoded = jwt.verify(token, process.env.JWT_SECRET);
   const userId = decoded.userID;
   console.log(req.body);
-  
+
 
   // sanity checks
   if (!Number.isInteger(stake) || stake <= 0) return res.status(400).json({ error: 'Invalid stake' });
   if (odds <= 1) return res.status(400).json({ error: 'Invalid odds' });
 
-  // 1) Atomically deduct if balance >= stake
-  const user = await User.findOneAndUpdate(
-    { _id: userId, 'balance': { $gte: stake } },
-    { $inc: { 'balance': -stake } },
-    { new: true } // return updated doc
-  );
-  if (!user) return res.status(400).json({ error: 'Insufficient balance' });
+  let betPlacedData = await placeSportsBetTx({ userId, eventId: matchId, market, selection, stake, odds });
 
-  // 2) Create bet (freeze odds at placement time)
-  const potentialPayout = Math.round(stake * odds); // still integer coins if stake is coins & odds decimal (round)
-  const bet = await Bet.create({
-    userId, matchId, market: 'h2h', selection, stake, odds, potentialPayout
-  });
+  console.log(betPlacedData);
 
-  // 3) Ledger record (debit)
-  const tx = await Transaction.create({
-    userId, type: 'bet_place', amount: -stake, balanceAfter: user.balance,
-    meta: { betId: bet._id.toString(), matchId, selection, odds }
-  });
+  // try {
+  //   const io = getIO();
+  //   const sockets = await io.fetchSockets();
 
-  return res.json({ ok: true, betId: bet._id, balance: user.balance, potentialPayout });
+  //   for (const sock of sockets) {
+  //     // console.log("I AM CALLED !");
+  //     // console.log("SOCK: ", sock.userID);
+
+  //     if (!sock.userID) continue;  // skip game sockets
+  //     const data = await fetchBalance(sock.userId);
+
+  //     sock.emit("wallet:update", { ok: true, ...data });
+  //   }
+  // } catch (error) {
+
+  // }
+
+  res.status(200).json({ ok: true, data: betPlacedData, message: "Bet placed successfully !" });
 
 
 }
