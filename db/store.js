@@ -101,7 +101,7 @@ async function placeBetTx({ userId, game, tableId, roundId, market, stake }) {
     if (!r || r.status !== 'OPEN' || Date.now() >= toMs(r.betsCloseAt)) {
       throw new Error('BETS_LOCKED');
     }
-
+    
     const u = await User.findOneAndUpdate(
       { _id: userId, balance: { $gte: stake } },
       { $inc: { balance: -stake } },
@@ -234,6 +234,7 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
     let pushes = 0;
 
     if (canonGame === 'SEVEN_UP_DOWN') {
+      console.log("I TOO WAS CALLED");
       for (const b of bets) {
         const pick = normalize(b.market);
         const won = pick === canonFirstOutcome || pick === canonGroupOutcome || pick == canonSuitOutcome;
@@ -266,7 +267,7 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
           });
           txDocs.push({
             userId: b.userId,
-            type: 'bet_win',
+            type: 'payout_win',
             amount: payout,
             // balanceAfter: (optional; see note below)
             meta: { betId: b._id, roundId, game: canonGame, market: pick, outcome: canonOutcome }
@@ -280,13 +281,15 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
         }
       }
     } else if (canonGame === 'HIGH_LOW') {
+      
+      
       const tiePush = meta.tiePush !== false;
       const marketWins = canonOutcome === 'HIGH' ? 'high' : canonOutcome === 'LOW' ? 'low' : null;
       const roundOdds = odds
 
       for (const b of bets) {
         const pick = normalize(b.market);
-        console.log("PICK :", pick);
+        // console.log("PICK :", pick);
 
         let won = pick === canonFirstOutcome || pick === canonGroupOutcome || pick == canonSuitOutcome;
         let status = won ? 'WIN' : 'LOST';
@@ -335,15 +338,15 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
     else if (canonGame === "AMAR_AKBAR_ANTHONY") {
       for (const b of bets) {
         const pick = normalize(b.market);                 // "AMAR" | "AKBAR" | "ANTHONY"
-        console.log("Pick: ", pick);
-        console.log("Outcome: ", canonFirstOutcome);
-        console.log("Group: ", canonGroupOutcome);
-        console.log("Suit: ", canonSuitOutcome);
+        // console.log("Pick: ", pick);
+        // console.log("Outcome: ", canonFirstOutcome);
+        // console.log("Group: ", canonGroupOutcome);
+        // console.log("Suit: ", canonSuitOutcome);
 
         const won = pick === canonFirstOutcome || pick === canonGroupOutcome || pick == canonSuitOutcome;
         const odd = won ? (AAAODDS[pick] || 0) : 0;
 
-        console.log("Won Result: ", won);
+        // console.log("Won Result: ", won);
 
 
         // Full payout = stake * odd (adjust if you deduct commission elsewhere)
@@ -403,11 +406,11 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
 
       for (const b of bets) {
         const pick = normalize(b.market);                 // "AMAR" | "AKBAR" | "ANTHONY"
-        console.log("Pick: ", pick);
+        // console.log("Pick: ", pick);
         const won = pick === result || pick === tigerSuit || pick == tigerGroup || pick === dragonSuit || pick === draginGroup;
         const odd = won ? (roundOdds[pick] || 0) : 0;
 
-        console.log("Won Result: ", won);
+        // console.log("Won Result: ", won);
 
 
         // Full payout = stake * odd (adjust if you deduct commission elsewhere)
@@ -459,11 +462,11 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
     if (betUpdates.length) {
       await Bet.bulkWrite(betUpdates, { session, ordered: false });
     }
-    console.log(walletIncs);
+    // console.log(walletIncs);
     if (walletIncs.length) {
       await User.bulkWrite(walletIncs, { session, ordered: false });
     }
-    console.log("Trans Doc: ", txDocs);
+    // console.log("Trans Doc: ", txDocs);
 
     if (txDocs.length) await Transaction.insertMany(txDocs, { session });
 
@@ -471,6 +474,8 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
     round.status = 'SETTLED';          // canonical round phase
     // If (and only if) your UI insists on 'WON'/'LOST' for round.status, switch to:
     // round.status = 'CLOSED';
+    console.log(winners);
+    
     round.outcome = canonOutcome;
     round.summary = {
       winners,

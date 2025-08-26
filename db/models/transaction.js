@@ -15,7 +15,7 @@ const TransactionSchema = new mongoose.Schema({
   amount: { type: Number, required: true, min: -9_000_000_000, max: 9_000_000_000 },
 
   // Snapshot of user's balance *after* this tx is applied
-  balanceAfter: { type: Number, required: true },
+  balanceAfter: { type: Number },
 
   // Optional operational status for async flows (deposits/withdrawals)
   status: { type: String, enum: ['completed','pending','failed'], default: 'completed', index: true },

@@ -37,6 +37,10 @@ function rngDice() {
   if (suit === "hearts" || suit === "diamonds") group = "red";
   else group = "black";
 
+  console.log(high);
+  console.log(low);
+  
+
   return { high, low, seven, group, suit, card };
 }
 

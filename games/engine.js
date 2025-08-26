@@ -1,6 +1,8 @@
 // engine.js
 'use strict';
 const { performance, monitorEventLoopDelay } = require('perf_hooks');
+const { fetchBalance } = require("../db/store");
+
 
 class RoundEngine {
   constructor({
@@ -100,7 +102,7 @@ class RoundEngine {
   async nextRound() {
     if (!this.running) return;
 
-    console.log(`[engine ${this.roomKey()}] Round starting (pid=${process.pid})`);
+    // console.log(`[engine ${this.roomKey()}] Round starting (pid=${process.pid})`);
 
     // new nonce to invalidate any stray timers from old rounds
     this._nonce += 1;
@@ -125,7 +127,7 @@ class RoundEngine {
     this._resultT = setTimeout(() => this.resultIfCurrent(nonce).catch(console.error), this.ROUND_MS);
     this._endT = setTimeout(() => this.endIfCurrent(nonce).catch(console.error), this.ROUND_MS + this.RESULT_SHOW_MS);
 
-    console.log(`[engine ${this.roomKey()}] timers set: lock=${this.BET_MS}ms result=${this.ROUND_MS}ms end=${this.ROUND_MS + this.RESULT_SHOW_MS}ms`);
+    // console.log(`[engine ${this.roomKey()}] timers set: lock=${this.BET_MS}ms result=${this.ROUND_MS}ms end=${this.ROUND_MS + this.RESULT_SHOW_MS}ms`);
 
     // Persist round ASYNC (do not block scheduling)
     const payload = {
@@ -148,7 +150,7 @@ class RoundEngine {
           try { snap = this.hooks.decorateSnapshot(snap) || snap; } catch (e) { console.error("decorateSnapshot error", e); }
         }
         this.io.to(this.roomKey()).emit('round:start', snap);
-        console.log(`[engine ${this.roomKey()}] Round Created! id=${this.round?._id}`);
+        // console.log(`[engine ${this.roomKey()}] Round Created! id=${this.round?._id}`);
       })
       .catch(err => {
         console.error(`[engine ${this.roomKey()}] onCreateRound error:`, err);
@@ -174,11 +176,11 @@ class RoundEngine {
 
     this._lockEmitted = true;
 
-    console.log(`Lock Called @ ${new Date().toISOString()} (expected ~${new Date(this._lockAt).toISOString()})`);
+    // console.log(`Lock Called @ ${new Date().toISOString()} (expected ~${new Date(this._lockAt).toISOString()})`);
 
     // local state + emit ASAP
     if (this.round) this.round.status = 'LOCKED';
-    
+
     this.io.to(this.roomKey()).emit('round:lock', {
       roundId: this.round?._id || null,
       game: this.game,
@@ -218,7 +220,7 @@ class RoundEngine {
         console.error(`[engine ${this.roomKey()}] onComputeResult error:`, err);
       }
 
-      console.log("Result Is: ", result);
+      // console.log("Result Is: ", result);
       // Emit RESULT immediately
       this.io.to(this.roomKey()).emit('round:result', {
         roundId: this.round?._id || null,
@@ -227,23 +229,28 @@ class RoundEngine {
         ...(result || { noResult: true }),
       });
 
+
+      console.log("ROUND ID: ", result);
+
+
       // Persist settlement asynchronously using the SAME result
       if (this.hooks.onSettle && this.round?._id) {
         Promise.resolve()
-          .then(() => {
+          .then(async () => {
+            console.log("RESULT SETLEMENT CALLED!!");
+
             this.hooks.onSettle(this.round._id, result);
-            this.io.to(this.roomKey()).emit("wallet:fetch", {
-              roundId: this.round._id,
-            });
           })
           .catch(err => console.error(`[engine ${this.roomKey()}] onSettle error:`, err));
       }
 
     } else if (this.hooks.onSettle && this.round?._id) {
+
+
       // Legacy mode: let onSettle compute & return a lightweight result
       Promise.resolve()
         .then(() => this.hooks.onSettle(this.round._id))
-        .then((res) => {
+        .then(async (res) => {
 
           this.io.to(this.roomKey()).emit('round:result', {
             roundId: this.round?._id || null,
@@ -251,6 +258,9 @@ class RoundEngine {
             tableId: this.tableId,
             ...(res || { noResult: true }),
           });
+
+
+
         })
         .catch(err => {
           console.error(`[engine ${this.roomKey()}] onSettle error:`, err);
@@ -286,12 +296,23 @@ class RoundEngine {
 
     this._endEmitted = true;
 
-    console.log(`End Called @ ${new Date().toISOString()} (expected ~${new Date(this._endAt).toISOString()})`);
+    // console.log(`End Called @ ${new Date().toISOString()} (expected ~${new Date(this._endAt).toISOString()})`);
 
     // fire-and-forget onEnd
     if (this.hooks.onEnd && this.round?._id) {
       Promise.resolve()
-        .then(() => this.hooks.onEnd(this.round._id))
+        .then(async() => {
+          this.hooks.onEnd(this.round._id)
+          const sockets = await this.io.fetchSockets();
+
+          for (const sock of sockets) {
+            console.log("I AM CALLED !");
+            console.log("SOCK: ", sock.userID);
+            if (!sock.userID) continue;  // skip game sockets
+            const data = await fetchBalance(sock.userID);
+            sock.emit("wallet:update", { ok: true, ...data });
+          }
+        })
         .catch(err => console.error(`[engine ${this.roomKey()}] onEnd error:`, err));
     }
 

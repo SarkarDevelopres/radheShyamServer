@@ -52,6 +52,10 @@ function rngDragonTiger() {
     tigerSuit: tiger.suit,
     tigerGroup: tiger.group,
   };
+  // console.log(winner);
+  // console.log(dragon);
+  // console.log(tiger);
+  
 
   return { dragon, tiger, outcome, odds: DRAGON_TIGER_ODDS };
 }

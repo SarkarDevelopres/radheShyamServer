@@ -5,7 +5,7 @@ const { initSevenUpDown } = require("./games/sevenUpDown");
 const { initHighLow } = require("./games/highlow");
 const { initAAA } = require("./games/aaa");
 const { initDragonTiger } = require("./games/dragontiger");
-
+const jwt = require('jsonwebtoken');
 function canonGameName(g) {
   if (!g) return "";
   const s = String(g).toLowerCase().replace(/[\s\-]/g, "_");
@@ -21,30 +21,48 @@ function canonGameName(g) {
 function attachSocket(server) {
   const io = new Server(server, {
     cors: {
-       origin: ["http://localhost:3000", "https://radheshyamexch.com","https://www.eradheshyamexch.com"], // add frontend origins as needed
+      origin: ["http://localhost:3000", "https://radheshyamexch.com", "https://www.eradheshyamexch.com"], // add frontend origins as needed
       methods: ["GET", "POST"],
       credentials: true,
     },
   });
 
   // --- Start game engines ---
-  // const seven = initSevenUpDown(io, "table-1"); 
-  // const highlow = initHighLow(io, "default");
-  // const aaa = initAAA(io, "default");
-  // const dragontiger = initDragonTiger(io, "default");
+  const seven = initSevenUpDown(io, "table-1");
+  const highlow = initHighLow(io, "default");
+  const aaa = initAAA(io, "default");
+  const dragontiger = initDragonTiger(io, "default");
 
   // Registry so we can fetch engine by roomKey on join
-  // const engines = {
-  //   ["SEVEN_UP_DOWN:table-1"]: seven,
-  //   ["HIGH_LOW:default"]: highlow,
-  //   ["AMAR_AKBAR_ANTHONY:default"]: aaa,
-  //   ["DRAGON_TIGER:default"]: dragontiger,
-  // };
+  const engines = {
+    ["SEVEN_UP_DOWN:table-1"]: seven,
+    ["HIGH_LOW:default"]: highlow,
+    ["AMAR_AKBAR_ANTHONY:default"]: aaa,
+    ["DRAGON_TIGER:default"]: dragontiger,
+  };
 
   io.on("connection", (socket) => {
     socket.onAny((event, ...args) => {
       // console.log("[socket] IN:", event, args[0]);
     });
+    const token = socket.handshake.auth?.token;
+    // console.log("IsToken: ",token);
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        socket.userID = decoded.userID;   // 👈 store mapping
+        socket.join(`user:${socket.userID}`);
+      } catch (err) {
+        console.error("Invalid token:", err);
+      }
+    }
+    socket.on("wallet:update", (data) => {
+      // This will only fire if a CLIENT emits wallet:update (not in your flow).
+      // In your case, the server is the one emitting, so this won't normally trigger.
+      console.log(`[socket] wallet:update received on server for socket ${socket.id}`, data);
+    });
+
     // Join a game/table room to get lifecycle events
     socket.on("join", ({ game, tableId }) => {
       const canon = canonGameName(game);
@@ -65,10 +83,15 @@ function attachSocket(server) {
 
     socket.on("wallet:fetch", async ({ userId }, cb) => {
       try {
-        const data = await fetchBalance(userId);
+        console.log("RECIEVED TOKEN :", userId);
+
+        const decoded = jwt.verify(userId, process.env.JWT_SECRET);
+        // console.log("DECODED TOKEN :", decoded);
+        const userID = decoded.userID;
+        const data = await fetchBalance(userID);
         // e.g. { balance: number }
-        console.log("DATA: ",data);
-        
+        console.log("DATA: ", data);
+
         cb?.({ ok: true, ...data });
       } catch (e) {
         console.error("[wallet:fetch] error:", e);
@@ -81,6 +104,8 @@ function attachSocket(server) {
       "bet:place",
       async ({ userId, roundId, game, tableId, market, stake }, cb) => {
         try {
+          const decoded = jwt.verify(userId, process.env.JWT_SECRET);
+          const userID = decoded.userID;
           const canon = canonGameName(game);
           const tid = tableId || "default";
           console.log(
@@ -88,13 +113,15 @@ function attachSocket(server) {
           );
 
           const out = await placeBetTx({
-            userId,
+            userId: userID,
             roundId,
             game: canon,     // store canonical game name
             tableId: tid,
             market,
             stake: Number(stake),
           });
+          const data = await fetchBalance(userID);
+          io.to(`user:${userID}`).emit("wallet:update", { ok: true, ...data });
           cb?.(out);
         } catch (e) {
           console.error("[bet:place] error:", e);

@@ -107,6 +107,9 @@ function rngHighLow() {
   else if (firstOutcome === "LOW") winMarket = "low";
   else winMarket = null;
 
+  console.log(nextCard);
+  
+
   return { baseCard, nextCard, outcome: finalOutcome, winMarket, odds };  // RETURN odds
 }
 
@@ -135,7 +138,7 @@ function initHighLow(io, tableId = "default") {
        * Accepts engine payload: { game, tableId, startAt, betsCloseAt, resultAt, endAt, status }
        */
       decorateSnapshot: (snap) => {
-        console.log("Decorate Snap called");
+        // console.log("Decorate Snap called");
 
         const rid = snap.id;                      // engine.publicRound() uses 'id'
         const res = rid && prepared.get(rid);
@@ -146,7 +149,7 @@ function initHighLow(io, tableId = "default") {
         // 1) Create the round to get a real roundId
         // p typically has timings + game/table. Your createRound should return the new id.
         const row = await createRound(p);              // -> { roundId, ... }  (ensure this!)
-        console.log("Row: ", row);
+        // console.log("Row: ", row);
 
         const roundId = row._id;
         if (!roundId) throw new Error("createRound must return roundId");
@@ -202,7 +205,7 @@ function initHighLow(io, tableId = "default") {
       },
 
       onSettle: async (roundId, result) => {
-        console.log("RESULT: ", result);
+        // console.log("RESULT: ", result);
 
         const res = prepared.get(roundId) || result;
         await settleRoundTx({
