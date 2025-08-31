@@ -3,8 +3,27 @@ dotenv.config();
 const jwt = require('jsonwebtoken');
 const Round = require('../db/models/round');
 const User = require('../db/models/user');
+const Admin = require('../db/models/admin');
 const Transaction = require('../db/models/transaction');
 // const bcrypt = require("bcryptjs");
+
+
+function isValidIndianPhone(phone) {
+    const str = String(phone);
+
+    // Must start with 91 and then exactly 10 digits
+    if (!/^91\d{10}$/.test(str)) return false;
+
+    const number = str.slice(2); // get last 10 digits
+
+    // Reject all identical digits (0000000000, 1111111111, etc.)
+    if (/^(\d)\1{9}$/.test(number)) return false;
+
+    // Reject sequential ascending and descending
+    if (number === "1234567890" || number === "9876543210") return false;
+
+    return true; // ✅ Valid
+}
 
 exports.gameLog = async (req, res) => {
 
@@ -443,7 +462,7 @@ exports.deleteUser = async (req, res) => {
 
         const { userId } = req.body;
 
-        if (!userId ) {
+        if (!userId) {
             return res.status(400).json({ ok: false, message: "userId required" });
         }
 
@@ -467,29 +486,94 @@ exports.deleteUser = async (req, res) => {
 }
 
 exports.findUser = async (req, res) => {
-  try {
-    const { username, email, phone } = req.body;
+    try {
+        const { username, email, phone } = req.body;
 
-    if (!username && !email && !phone) {
-      return res.status(400).json({ ok: false, message: "Provide at least one field" });
+        if (!username && !email && !phone) {
+            return res.status(400).json({ ok: false, message: "Provide at least one field" });
+        }
+
+        // Build query object dynamically
+        let query = {};
+        if (username) query.username = username;
+        if (email) query.email = email;
+        if (phone) query.phone = phone;
+
+        const user = await User.findOne(query);
+
+        if (!user) {
+            return res.status(404).json({ ok: false, message: "User not found" });
+        }
+
+        return res.status(200).json({ ok: true, user, message: "Found user" });
+
+    } catch (error) {
+        console.error("FindUser error:", error);
+        return res.status(500).json({ ok: false, message: "Server error" });
     }
-
-    // Build query object dynamically
-    let query = {};
-    if (username) query.username = username;
-    if (email) query.email = email;
-    if (phone) query.phone = phone;
-
-    const user = await User.findOne(query);
-
-    if (!user) {
-      return res.status(404).json({ ok: false, message: "User not found" });
-    }
-
-    return res.status(200).json({ ok: true, user, message:"Found user" });
-
-  } catch (error) {
-    console.error("FindUser error:", error);
-    return res.status(500).json({ ok: false, message: "Server error" });
-  }
 };
+
+exports.getNumber = async (req, res) => {
+    try {        
+
+        let phoneDetails = await Admin.findOne({role:"admin"}).select("phone");
+        res.status(200).json({ok:true,data:phoneDetails})
+        
+    } catch (error) {
+        console.error("number not found:", error);
+        return res.status(500).json({ ok: false, message: "Server error" });
+    }
+}
+
+exports.chngWhatsapp = async (req, res) => {
+
+    try {
+        const authHeader = req.headers["authorization"];
+        if (!authHeader) {
+            return res.status(401).json({ ok: false, message: "No token provided" });
+        }
+
+        // Format: "Bearer <token>"
+        const token = authHeader.split(" ")[1];
+        if (!token) {
+            return res.status(401).json({ ok: false, message: "Invalid token format" });
+        }
+
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const adminId = decoded.adminID;
+
+        if (!adminId) {
+            return res.status(401).json({ ok: false, message: "Unauthorized" });
+        }
+
+        const { phone } = req.body;       
+
+        if (!phone) {
+            return res.status(401).json({ ok: false, message: "Invalid Value" });
+        }
+
+        let validity = isValidIndianPhone(phone)
+
+        if (validity) {
+        
+            const updatedAdmin = await Admin.findByIdAndUpdate(
+                adminId,
+                { phone: phone },
+                { new: true }
+            );
+
+            res.status(200).json({ ok: true, message: "Succesfully No. Updated!", data: updatedAdmin });
+        }
+
+        else{
+            return res.status(401).json({ ok: false, message: "Invalid Value" });
+        }
+
+
+
+    } catch (error) {
+        console.error("number cannot be updated:", error);
+        return res.status(500).json({ ok: false, message: "Server error" });
+    }
+}

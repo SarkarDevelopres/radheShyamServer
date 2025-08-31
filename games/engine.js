@@ -237,7 +237,7 @@ class RoundEngine {
       if (this.hooks.onSettle && this.round?._id) {
         Promise.resolve()
           .then(async () => {
-            console.log("RESULT SETLEMENT CALLED!!");
+            // console.log("RESULT SETLEMENT CALLED!!");
 
             this.hooks.onSettle(this.round._id, result);
           })
@@ -306,8 +306,8 @@ class RoundEngine {
           const sockets = await this.io.fetchSockets();
 
           for (const sock of sockets) {
-            console.log("I AM CALLED !");
-            console.log("SOCK: ", sock.userID);
+            // console.log("I AM CALLED !");
+            // console.log("SOCK: ", sock.userID);
             if (!sock.userID) continue;  // skip game sockets
             const data = await fetchBalance(sock.userID);
             sock.emit("wallet:update", { ok: true, ...data });

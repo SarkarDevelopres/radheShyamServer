@@ -5,5 +5,10 @@ const OddsController = require('../controllers/odds.controller');
 router.get('/cricket', OddsController.cricket);
 router.get('/soccer', OddsController.football);
 router.get('/tennis', OddsController.tennis);
+router.get('/basketball', OddsController.basketball);
+router.get('/baseball', OddsController.tennis);
+router.get('/live', OddsController.live);
+router.post('/matchOdds', OddsController.live);
+router.post('/all', OddsController.allSports);
 
 module.exports = router;

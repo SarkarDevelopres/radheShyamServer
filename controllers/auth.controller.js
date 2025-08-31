@@ -63,7 +63,7 @@ exports.adminLogin = async (req, res) => {
         console.log(email, password);
         
 
-        let exisitingAdmin = await User.findOne({ "email": email }).select('password');
+        let exisitingAdmin = await Admin.findOne({ "email": email }).select('password');
 
         console.log(exisitingAdmin);
 

@@ -8,6 +8,8 @@ router.post('/totalGames', AdminController.totalGames);
 router.post('/totalUsersDetails', AdminController.totalUsersDetails);
 router.post('/totalTransactionDetails', AdminController.totalTransactionDetails);
 router.post('/todayTransactions', AdminController.getTodayTotalTransactions);
+router.post('/chngWhatsapp', AdminController.chngWhatsapp);
+router.get('/getNum', AdminController.getNumber);
 
 // USER APIS
 router.post('/createUser', AdminController.createUser);

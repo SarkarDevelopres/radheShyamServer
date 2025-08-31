@@ -8,6 +8,7 @@ const OddsSchema = new mongoose.Schema({
   away: String,
   title: String,                                     // m.sport_title
   commenceTime: { type: Date, index: true },
+  expectedEndAt: { type: Date, index: true },
 
   bookmakerKey: { type: String, default: null },     // e.g. first bookmaker key
   marketKey: { type: String, default: 'h2h' },
@@ -17,6 +18,8 @@ const OddsSchema = new mongoose.Schema({
     name: String,
     price: Number
   }],
+  isBet: { type: Boolean, default:false},
+  expectedCategory: { type: String },
 
   // helpful for debugging
   provider: { type: String, default: 'the-odds-api' },

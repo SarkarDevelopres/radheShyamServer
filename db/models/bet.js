@@ -31,6 +31,8 @@ const BetSchema = new mongoose.Schema({
     default: 'OPEN',
     index: true
   },
+
+  meta:{type:Object}
 }, { timestamps: true });
 
 // My bets pagination

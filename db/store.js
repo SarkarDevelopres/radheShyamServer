@@ -87,7 +87,7 @@ async function lockBetsForRound(roundId) {
 
 
 async function fetchBalance(userId) {
-  console.log("USERID: ", userId);
+  // console.log("USERID: ", userId);
 
   const u = await User.findById(userId).select("balance");
   return u;
@@ -107,7 +107,7 @@ async function placeBetTx({ userId, game, tableId, roundId, market, stake }) {
       { $inc: { balance: -stake } },
       { new: true, session }
     );
-    if (!u) throw new Error('INSUFFICIENT_FUNDS');
+    if (!u) throw new Error('INSUFFICIENT FUNDS');
 
     const normGame = normalize(game);
     const normMarket = normalize(market);
@@ -233,7 +233,7 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
     let pushes = 0;
 
     if (canonGame === 'SEVEN_UP_DOWN') {
-      console.log("I TOO WAS CALLED");
+      // console.log("I TOO WAS CALLED");
       for (const b of bets) {
         const pick = normalize(b.market);
         const won = pick === canonFirstOutcome || pick === canonGroupOutcome || pick == canonSuitOutcome;
@@ -337,16 +337,8 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
     else if (canonGame === "AMAR_AKBAR_ANTHONY") {
       for (const b of bets) {
         const pick = normalize(b.market);                 // "AMAR" | "AKBAR" | "ANTHONY"
-        // console.log("Pick: ", pick);
-        // console.log("Outcome: ", canonFirstOutcome);
-        // console.log("Group: ", canonGroupOutcome);
-        // console.log("Suit: ", canonSuitOutcome);
-
         const won = pick === canonFirstOutcome || pick === canonGroupOutcome || pick == canonSuitOutcome;
         const odd = won ? (AAAODDS[pick] || 0) : 0;
-
-        // console.log("Won Result: ", won);
-
 
         // Full payout = stake * odd (adjust if you deduct commission elsewhere)
         const payout = won ? Math.round(Number(b.stake) * odd) : 0;
@@ -405,12 +397,9 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
 
       for (const b of bets) {
         const pick = normalize(b.market);                 // "AMAR" | "AKBAR" | "ANTHONY"
-        // console.log("Pick: ", pick);
+
         const won = pick === result || pick === tigerSuit || pick == tigerGroup || pick === dragonSuit || pick === draginGroup;
         const odd = won ? (roundOdds[pick] || 0) : 0;
-
-        // console.log("Won Result: ", won);
-
 
         // Full payout = stake * odd (adjust if you deduct commission elsewhere)
         const payout = won ? Math.round(Number(b.stake) * odd) : 0;
@@ -473,7 +462,7 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
     round.status = 'SETTLED';          // canonical round phase
     // If (and only if) your UI insists on 'WON'/'LOST' for round.status, switch to:
     // round.status = 'CLOSED';
-    console.log(winners);
+    // console.log(winners);
     
     round.outcome = canonOutcome;
     round.summary = {
@@ -488,7 +477,7 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
     await round.save({ session });
 
     await session.commitTransaction();
-    return { ok: true, settled: bets.length, outcome: canonOutcome, summary: round.summary };
+    return { ok: true, settled: bets.length, outcome: outcome, summary: round.summary };
   } catch (e) {
     await session.abortTransaction().catch(() => { });
     console.error('settleRoundTx error:', e);
