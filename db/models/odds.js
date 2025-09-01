@@ -18,12 +18,17 @@ const OddsSchema = new mongoose.Schema({
     name: String,
     price: Number
   }],
-  isBet: { type: Boolean, default:false},
+  isBet: { type: Boolean, default: false },
   expectedCategory: { type: String },
 
   // helpful for debugging
   provider: { type: String, default: 'the-odds-api' },
+  sportsKey: { type: String },
 
+  streamLink: {
+    link: { type: Object },
+    type: { type: String, enum: ["iframe", "link"] }
+  },
   // when we last refreshed this record from upstream
   fetchedAt: { type: Date, default: Date.now, index: true }
 }, { timestamps: true });

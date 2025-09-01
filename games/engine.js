@@ -9,8 +9,8 @@ class RoundEngine {
     io,
     game,
     tableId = 'default',
-    roundMs = 8000,      // start -> result
-    betMs = 5000,        // start -> lock
+    roundMs = 15000,      // start -> result
+    betMs = 12000,        // start -> lock
     resultShowMs = 3000, // result -> end
     hooks = {}
   }) {

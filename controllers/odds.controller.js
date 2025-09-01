@@ -146,6 +146,7 @@ function normalizeApiMatch(m) {
     away: m.away_team,
     title: `${m.home_team} vs ${m.away_team}`, // clearer for UI rows
     leagueTitle: m.sport_title || null,
+    sportskey:m.sport_key,
     // store as Date for proper indexing & comparisons
     commenceTime: m.commence_time ? new Date(m.commence_time) : null,
     bookmakerKey: chosen?.bookmakerKey ?? firstBM?.key ?? null,
@@ -219,6 +220,8 @@ async function upsertOddsBatch(sport, matches) {
   for (const m of matches) {
     const doc = normalizeApiMatch(m);
 
+    // console.log(doc);
+    
     // ---- HARD GUARD: skip anything with NO odds ----
     if (!Array.isArray(doc.odds) || doc.odds.length === 0) continue;
 
@@ -247,6 +250,7 @@ async function upsertOddsBatch(sport, matches) {
             isBet: false,
             expectedEndAt: EndTime,
             expectedCategory: category,
+            sportsKey:doc.sportskey,
             provider: 'the-odds-api',
             fetchedAt: new Date()
           }
@@ -295,6 +299,7 @@ async function upsertEventsBatch(sport, matches) {
             isBet: false,
             expectedEndAt: EndTime,
             expectedCategory: category,
+            sportsKey:doc.sportskey,
             provider: 'the-odds-api',
             fetchedAt: new Date()
           }
@@ -475,34 +480,40 @@ exports.live = async (req, res) => {
 // Fetch odds for a single matchId (optionally provide sport via :sport param / query / body)
 exports.matchOdds = async (req, res) => {
   try {
-    const { matchId } = req.body || {};
+    const { matchId } = req.body;
     if (!matchId) return res.status(400).json({ success: false, error: 'matchId required' });
 
-    const sportKey =
-      req.params?.sport || req.query?.sport || req.body?.sport || 'cricket';
-    const API_SPORT = sportKey === 'football' ? 'soccer' : sportKey;
-
+    const fetchData = await Odds.findOne({matchId:matchId}).select('sportsKey streamLink');
+    
     const url =
-      `https://api.the-odds-api.com/v4/sports/${API_SPORT}/odds/` +
-      `?regions=uk&markets=h2h_lay&apiKey=${process.env.ODDS_API_KEY}`;
-
+    `https://api.the-odds-api.com/v4/sports/${fetchData.sportsKey}/events/${matchId}/odds?apiKey=${process.env.ODDS_API_KEY}&regions=uk&markets=h2h`;
+    
     const apiRes = await fetch(url);
     if (!apiRes.ok) {
       return res.status(apiRes.status).json({ success: false, error: `Upstream ${apiRes.status}` });
     }
-
+    
     const raw = await apiRes.json();
-    const one = raw.find(m => m.id === matchId);
-    if (!one) return res.json({ success: true, data: null });
+    let bookmakers = [];
+    // console.log(raw);
 
-    const norm = normalizeApiMatch(one);
+    for ( let i=0; i<raw.bookmakers.length; i++ ){
+      
+      for (let j = 0; j < raw.bookmakers[i].markets.length; j++) {
 
-    // If odds would be empty, treat as unavailable
-    if (!Array.isArray(norm.odds) || norm.odds.length === 0) {
-      return res.json({ success: true, data: null });
+        let data = {
+          bookmaker:raw.bookmakers[i].key,
+          outcomes:raw.bookmakers[i].markets[j].outcomes,
+          market:raw.bookmakers[i].markets[j].key
+        }
+
+        bookmakers.push(data);
+      }
+
     }
 
-    return res.json({ success: true, data: norm });
+
+    return res.json({ success: true, data: bookmakers, meta:{sportkey:raw.sport_key, matchId:raw.id, market:raw.marketKey, streamLink:fetchData.streamLink } });
   } catch (error) {
     console.error('[odds] matchOdds error:', error);
     return res.status(500).json({ success: false, error: 'Failed to fetch odds' });

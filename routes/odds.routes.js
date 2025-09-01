@@ -8,7 +8,7 @@ router.get('/tennis', OddsController.tennis);
 router.get('/basketball', OddsController.basketball);
 router.get('/baseball', OddsController.tennis);
 router.get('/live', OddsController.live);
-router.post('/matchOdds', OddsController.live);
+router.post('/matchOdds', OddsController.matchOdds);
 router.post('/all', OddsController.allSports);
 
 module.exports = router;

@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const Round = require('../db/models/round');
 const User = require('../db/models/user');
 const Admin = require('../db/models/admin');
+const Odds = require('../db/models/odds');
 const Transaction = require('../db/models/transaction');
 // const bcrypt = require("bcryptjs");
 
@@ -514,11 +515,11 @@ exports.findUser = async (req, res) => {
 };
 
 exports.getNumber = async (req, res) => {
-    try {        
+    try {
 
-        let phoneDetails = await Admin.findOne({role:"admin"}).select("phone");
-        res.status(200).json({ok:true,data:phoneDetails})
-        
+        let phoneDetails = await Admin.findOne({ role: "admin" }).select("phone");
+        res.status(200).json({ ok: true, data: phoneDetails })
+
     } catch (error) {
         console.error("number not found:", error);
         return res.status(500).json({ ok: false, message: "Server error" });
@@ -547,7 +548,7 @@ exports.chngWhatsapp = async (req, res) => {
             return res.status(401).json({ ok: false, message: "Unauthorized" });
         }
 
-        const { phone } = req.body;       
+        const { phone } = req.body;
 
         if (!phone) {
             return res.status(401).json({ ok: false, message: "Invalid Value" });
@@ -556,7 +557,7 @@ exports.chngWhatsapp = async (req, res) => {
         let validity = isValidIndianPhone(phone)
 
         if (validity) {
-        
+
             const updatedAdmin = await Admin.findByIdAndUpdate(
                 adminId,
                 { phone: phone },
@@ -566,10 +567,109 @@ exports.chngWhatsapp = async (req, res) => {
             res.status(200).json({ ok: true, message: "Succesfully No. Updated!", data: updatedAdmin });
         }
 
-        else{
+        else {
             return res.status(401).json({ ok: false, message: "Invalid Value" });
         }
 
+
+
+    } catch (error) {
+        console.error("number cannot be updated:", error);
+        return res.status(500).json({ ok: false, message: "Server error" });
+    }
+}
+
+exports.getLiveOdds = async (req, res) => {
+    try {
+        const now = new Date();
+
+        console.log("I came!!");
+
+        const { sport, limit } = req.query;
+
+        // commenceTime: { $lte: now },
+        const filter = {
+            expectedEndAt: { $gt: now }    // non-empty odds
+        };
+        if (sport) filter.sport = sport;   // e.g., cricket, football, tennis, baseball, basketball_nba
+
+        const cap = Math.min(Math.max(parseInt(limit || '500', 10), 1), 1000);
+
+        // Pull candidate rows
+        const rows = await Odds.find(filter)
+            .sort({ commenceTime: 1, fetchedAt: -1 })
+            .limit(cap)
+            .lean();
+
+        // Dedupe by matchId (keep earliest start / latest fetched as per sort)
+        console.log(rows);
+
+
+
+
+        return res.json({ ok: true, data: rows });
+    } catch (err) {
+        console.error('[odds.getLiveOdds] error:', err);
+        return res.status(500).json({ success: false, error: 'Failed to fetch live odds' });
+    }
+};
+
+exports.updateOddsStream = async (req, res) => {
+    try {
+        console.log("I was called!! ");
+        
+        const authHeader = req.headers["authorization"];
+        if (!authHeader) {
+            return res.status(401).json({ ok: false, message: "No token provided" });
+        }
+
+        // Format: "Bearer <token>"
+        const token = authHeader.split(" ")[1];
+        if (!token) {
+            return res.status(401).json({ ok: false, message: "Invalid token format" });
+        }
+
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const adminId = decoded.adminID;
+
+        if (!adminId) {
+            return res.status(401).json({ ok: false, message: "Unauthorized" });
+        }
+
+        const { id, streamLink, linkType } = req.body;
+
+        if (!id) {
+            return res.status(400).json({ ok: false, message: "Provide either id or matchId" });
+        }
+        if (typeof streamLink !== "string" || !streamLink.trim()) {
+            return res.status(400).json({ ok: false, message: "streamLink is required" });
+        }
+        try { new URL(streamLink); } catch {
+            // If it's not a full URL, you can reject or allow relative paths. Here we reject:
+            return res.status(400).json({ ok: false, message: "streamLink must be a valid URL" });
+        }
+
+        let updated = await Odds.findByIdAndUpdate(id,
+            {
+                $set: {
+
+                    streamLink:
+                    {
+                        link: streamLink,
+                        type: linkType
+                    }
+                }
+            }, { new: true });
+
+        if (!updated) {
+            return res.status(404).json({ ok: false, message: "Match not found" });
+        }
+
+        return res.json({
+            ok: true,
+            message: "Stream link updated",
+        });
 
 
     } catch (error) {

@@ -13,6 +13,7 @@ const BetSchema = new mongoose.Schema({
   selection: { type: String },                // team/runner
   odds: { type: Number },                     // decimal odds, frozen at placement
   bookmakerKey: { type: String },
+  lay: { type: Boolean, default: false },
 
   // CASINO/GAME fields
   game: { type: String, index: true },        // e.g. 'SEVEN_UP_DOWN'
@@ -32,7 +33,7 @@ const BetSchema = new mongoose.Schema({
     index: true
   },
 
-  meta:{type:Object}
+  meta: { type: Object }
 }, { timestamps: true });
 
 // My bets pagination

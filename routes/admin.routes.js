@@ -10,6 +10,9 @@ router.post('/totalTransactionDetails', AdminController.totalTransactionDetails)
 router.post('/todayTransactions', AdminController.getTodayTotalTransactions);
 router.post('/chngWhatsapp', AdminController.chngWhatsapp);
 router.get('/getNum', AdminController.getNumber);
+router.get('/getLiveOdds', AdminController.getLiveOdds);
+router.get('/getLiveOdds', AdminController.getLiveOdds);
+router.post('/updateOddsStream', AdminController.updateOddsStream);
 
 // USER APIS
 router.post('/createUser', AdminController.createUser);
