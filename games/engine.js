@@ -303,12 +303,11 @@ class RoundEngine {
       Promise.resolve()
         .then(async() => {
           this.hooks.onEnd(this.round._id)
+
           const sockets = await this.io.fetchSockets();
 
           for (const sock of sockets) {
-            // console.log("I AM CALLED !");
-            // console.log("SOCK: ", sock.userID);
-            if (!sock.userID) continue;  // skip game sockets
+            if (!sock.userID) continue;  // skip game sockets            
             const data = await fetchBalance(sock.userID);
             sock.emit("wallet:update", { ok: true, ...data });
           }

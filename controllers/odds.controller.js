@@ -485,6 +485,7 @@ exports.matchOdds = async (req, res) => {
 
     const fetchData = await Odds.findOne({matchId:matchId}).select('sportsKey streamLink');
     
+    console.log("Sports_Key: ",fetchData.sportsKey);
     const url =
     `https://api.the-odds-api.com/v4/sports/${fetchData.sportsKey}/events/${matchId}/odds?apiKey=${process.env.ODDS_API_KEY}&regions=uk&markets=h2h`;
     

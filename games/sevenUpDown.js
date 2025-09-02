@@ -73,9 +73,9 @@ function initSevenUpDown(io, tableId = 'table-1') {
       // Persist using the SAME result that was emitted.
       onSettle: async (roundId, result) => {
         const { high, low, seven, group, suit, card } = result || rngDice();
-        let firstOutcome = "HIGH";
-        if (high) firstOutcome = "HIGH";
-        else if (low) firstOutcome = "LOW";
+        let firstOutcome = "UP";
+        if (high) firstOutcome = "UP";
+        else if (low) firstOutcome = "DOWN";
         else if (seven) firstOutcome = "SEVEN";
         await settleRoundTx({
           roundId,

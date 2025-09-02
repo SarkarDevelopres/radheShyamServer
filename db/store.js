@@ -233,12 +233,14 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
     let pushes = 0;
 
     if (canonGame === 'SEVEN_UP_DOWN') {
+      
       // console.log("I TOO WAS CALLED");
       for (const b of bets) {
         const pick = normalize(b.market);
         const won = pick === canonFirstOutcome || pick === canonGroupOutcome || pick == canonSuitOutcome;
         const odd = won ? (SevenODDS[pick] || 0) : 0;
         const payout = won ? Math.round(Number(b.stake) * Number(odd)) : 0;
+      
 
         betUpdates.push({
           updateOne: {
