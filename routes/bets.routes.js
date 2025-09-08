@@ -3,5 +3,6 @@ const router = express.Router();
 const BetsController = require('../controllers/bets.controller');
 
 router.post('/place', BetsController.placeBets);
+router.post('/take', BetsController.takeBet);
 
 module.exports = router;

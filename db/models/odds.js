@@ -2,34 +2,21 @@
 const mongoose = require('mongoose');
 
 const OddsSchema = new mongoose.Schema({
-  sport: { type: String, required: true },           // 'cricket' | 'soccer' | 'tennis' ...
-  matchId: { type: String, required: true },         // m.id from API
-  home: String,
-  away: String,
-  title: String,                                     // m.sport_title
-  commenceTime: { type: Date, index: true },
-  expectedEndAt: { type: Date, index: true },
-
-  bookmakerKey: { type: String, default: null },     // e.g. first bookmaker key
+  sport: { type: String, required: true },
+  matchId:{ type: String, required: true },
+  bookmakerKey: { type: String, default: null },
   marketKey: { type: String, default: 'h2h' },
-
-  // normalized outcomes to render fast
   odds: [{
     name: String,
     price: Number
   }],
   isBet: { type: Boolean, default: false },
-  expectedCategory: { type: String },
-
-  // helpful for debugging
   provider: { type: String, default: 'the-odds-api' },
   sportsKey: { type: String },
-
   streamLink: {
     link: { type: Object },
     type: { type: String, enum: ["iframe", "link"] }
   },
-  // when we last refreshed this record from upstream
   fetchedAt: { type: Date, default: Date.now, index: true }
 }, { timestamps: true });
 

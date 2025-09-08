@@ -32,18 +32,18 @@ function attachSocket(server) {
   ioInstance = io;
 
   // --- Start game engines ---
-  const seven = initSevenUpDown(io, "table-1");
-  const highlow = initHighLow(io, "default");
-  const aaa = initAAA(io, "default");
-  const dragontiger = initDragonTiger(io, "default");
+  // const seven = initSevenUpDown(io, "table-1");
+  // const highlow = initHighLow(io, "default");
+  // const aaa = initAAA(io, "default");
+  // const dragontiger = initDragonTiger(io, "default");
 
   // Registry so we can fetch engine by roomKey on join
-  const engines = {
-    ["SEVEN_UP_DOWN:table-1"]: seven,
-    ["HIGH_LOW:default"]: highlow,
-    ["AMAR_AKBAR_ANTHONY:default"]: aaa,
-    ["DRAGON_TIGER:default"]: dragontiger,
-  };
+  // const engines = {
+  //   ["SEVEN_UP_DOWN:table-1"]: seven,
+  //   ["HIGH_LOW:default"]: highlow,
+  //   ["AMAR_AKBAR_ANTHONY:default"]: aaa,
+  //   ["DRAGON_TIGER:default"]: dragontiger,
+  // };
 
   io.on("connection", (socket) => {
     socket.onAny((event, ...args) => {

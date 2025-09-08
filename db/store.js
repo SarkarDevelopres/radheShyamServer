@@ -88,7 +88,8 @@ async function lockBetsForRound(roundId) {
 
 async function fetchBalance(userId) {
   // console.log("USERID: ", userId);
-
+  console.log(userId);
+  
   const u = await User.findById(userId).select("balance");
   return u;
 }
@@ -151,6 +152,8 @@ async function placeBetTx({ userId, game, tableId, roundId, market, stake }) {
 
 // ---------- sports bet placement (HTTP route) ----------
 async function placeSportsBetTx({ userId, eventId, market,selection, stake, odds }) {
+  console.log("USerID: u",userId);
+  
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
@@ -159,6 +162,8 @@ async function placeSportsBetTx({ userId, eventId, market,selection, stake, odds
       { $inc: { balance: -stake } },
       { new: true, session }
     );
+    console.log("User Is: ",u);
+    
     if (!u) throw new Error('INSUFFICIENT_FUNDS');
 
     const potentialPayout = odds ? Math.floor(stake * odds) : undefined;
@@ -193,7 +198,7 @@ async function placeSportsBetTx({ userId, eventId, market,selection, stake, odds
 
     await session.commitTransaction();
     session.endSession();
-    return { ok: true, balance: u.balance };
+    return { ok: true, _doc:{balance: u.balance} };
   } catch (e) {
     await session.abortTransaction().catch(() => { });
     session.endSession();
