@@ -9,6 +9,7 @@ const fetch = global.fetch || ((...args) =>
   import('node-fetch').then(({ default: f }) => f(...args)));
 
 const THIRTY_MIN = 30 * 60 * 1000;
+const FIVE_MIN = 5 * 60 * 1000;
 
 // in-memory per-sport cache for the assembled response list (optional, fast path)
 const memCache = new Map(); // sport -> { ts, data }
@@ -16,7 +17,7 @@ const memCache = new Map(); // sport -> { ts, data }
 
 // --- helpers for the live endpoint ---
 
-const SPORTS = ['cricket', 'football', 'tennis', 'baseball', 'basketball_nba'];
+const SPORTS = ['football', 'tennis', 'baseball', 'basketball_nba'];
 
 function apiSportFor(sportKey) {
   // Map UI keys -> Odds API keys
@@ -43,18 +44,14 @@ function toClientRow(r) {
 }
 
 async function queryFreshRows(sport) {
-  const freshCut = new Date(Date.now() - THIRTY_MIN);
+  const freshCut = new Date(Date.now() - FIVE_MIN);
   // Fresh rows with non-empty odds
-  const rows = await Odds.find({
+  const rows = await Matchs.find({
     sport,
-    'odds.0': { $exists: true },
-    $or: [
-      { fetchedAt: { $gte: freshCut } },
-      { updatedAt: { $gte: freshCut } },
-      { createdAt: { $gte: freshCut } },
-    ],
+    isOdds: true,
+    status: "live"
   })
-    .sort({ commenceTime: 1, fetchedAt: -1 })
+    .sort({ start_time: 1, fetchedAt: -1 })
     .limit(1000)
     .lean();
 
@@ -77,7 +74,8 @@ async function fetchAndUpsertFromAPI(sportKey) {
     throw new Error(`Upstream ${apiRes.status}`);
   }
   const raw = await apiRes.json();
-  await upsertOddsBatch(sportKey, raw); // only upserts matches with non-empty odds
+  let items =
+    await upsertOddsBatch(sportKey, raw); // only upserts matches with non-empty odds
 }
 async function fetchAndUpsertEventFromAPI(sportKey) {
   const API_SPORT = apiSportFor(sportKey);
@@ -228,6 +226,43 @@ function expectedEnd(commenceTimeIsoOrDate, category) {
 
 // ------------------------- Upsert batch -------------------------
 
+
+async function upsertLiveOddsBatch(sport, newOdds, matchIdList) {
+  if (!Array.isArray(newOdds) || matchIdList.length == 0) return 0;
+  const oddsList = []
+  try {
+    for (m in matchIdList) {
+      const teamaBack = Number(newOdds.live_odds.matchodds?.teama?.back ?? 0);
+      const teambBack = Number(newOdds.live_odds.matchodds?.teamb?.back ?? 0);
+      oddsList.push({
+        updateOne: {
+          filter: { sport, matchId },              // ❌ was split; must be one object
+          update: {
+            $set: {
+              'odds.0.price': teamaBack,          // ❌ odds[0] invalid in $set keys
+              'odds.1.price': teambBack,          // use dot-notation for array indexes
+              fetchedAt: new Date(),
+            },
+            $setOnInsert: {
+              sport,
+              matchId,
+              isBet: false,
+            },
+          },
+          upsert: true,                            // insert if missing
+        },
+      })
+    }
+    const resOdd = await Odds.bulkWrite(oddsList, { ordered: false });
+    return (resOdd.modifiedCount || 0) + (resOdd.upsertedCount || 0);
+  } catch (error) {
+    console.error('upsertLiveOddsBatch error:', err);
+    throw err;
+  }
+
+
+}
+
 async function upsertOddsBatch(sport, matches, odds = []) {
   if (!Array.isArray(matches) || !matches.length) return 0;
 
@@ -238,13 +273,12 @@ async function upsertOddsBatch(sport, matches, odds = []) {
   const oddsList = [];
 
   if (sport == "cricket") {
-    console.log(matches);
+    // console.log(matches);
 
     for (const m of matches) {
       // ---- HARD GUARD: skip anything with NO odds ----
 
       if (!Array.isArray(m.odds) || m.odds.length === 0) continue;
-      if (m.startTime < 1757338200) continue;
       matchList.push({
         updateOne: {
           filter: {
@@ -262,7 +296,7 @@ async function upsertOddsBatch(sport, matches, odds = []) {
               end_time: m.endTime,
               start_time_ist: m.start_time_ist,
               end_time_ist: m.end_time_ist,
-              status: "scheduled",
+              status: m.status,
               isOdds: true,
               sportsKey: m.sportskey,
             }
@@ -361,7 +395,7 @@ async function upsertOddsBatch(sport, matches, odds = []) {
     }
   }
 
-  console.log(matchList);
+  // console.log(matchList);
 
 
 
@@ -430,6 +464,50 @@ function computeIsLive(r, nowTs = Date.now()) {
 }
 
 // Read from DB, exclude empty-odds rows, add isLive, then sort live-first
+async function readLiveSportFromDB(sport) {
+  const matchList = await Matchs.find({
+    sport: sport,
+    status: "live",
+    isOdds: true // ensure odds is non-empty
+  })
+    .select('matchId teamHome teamAway title start_time_ist status')
+    .sort({ start_time: 1 })
+    .limit(500)
+    .lean();
+
+  // console.log("MatchList: ", matchList);
+
+
+  for (let i = 0; i < matchList.length; i++) {
+    let odds = await Odds.findOne({ matchId: matchList[i].matchId });
+    // console.log(odds);
+
+    matchList[i] = {
+      ...matchList[i],
+      outcome: odds
+    }
+  }
+
+  const byMatch = new Map();
+  for (const m of matchList) {
+    if (!byMatch.has(m.matchId)) byMatch.set(m.matchId, m);
+  }
+
+  const list = Array.from(byMatch.values()).map(r => {
+    return {
+      matchId: r.matchId,
+      teamHome: r.teamHome,
+      teamAway: r.teamAway,
+      title: r.title,
+      start_time: r.start_time_ist,
+      status: r.status,
+      category: r.category,
+      odds: r.outcome.odds
+    };
+  });
+
+  return list;
+}
 async function readSportFromDB(sport) {
 
   const matchList = await Matchs.find({
@@ -562,9 +640,9 @@ const getDataEntity = async (req, res) => {
     const inMem = memCache.get("cricket");
     console.log("InMem: ", inMem);
 
-    if (inMem && (Date.now() - inMem.ts) < 10_000 && inMem.data.length > 0) {
-      return res.json({ success: true, data: inMem.data });
-    }
+    // if (inMem && (Date.now() - inMem.ts) < 10_000 && inMem.data.length > 0) {
+    //   return res.json({ success: true, data: inMem.data });
+    // }
     // if (await isDBFresh("cricket")) {
     //   console.log("I went here");
 
@@ -573,29 +651,37 @@ const getDataEntity = async (req, res) => {
     //   return res.json({ success: true, data: list });
     // }
 
-    let url = "https://restapi.entitysport.com/exchange/matches/?status=1&token=a34a487cafbb7c1a67af8d50d67a360e";
+    let scheduledUrl = "https://restapi.entitysport.com/exchange/matches/?status=1&token=a34a487cafbb7c1a67af8d50d67a360e";
+    let liveUrl = "https://restapi.entitysport.com/exchange/matches/?status=3&token=a34a487cafbb7c1a67af8d50d67a360e";
 
-    let data = await fetch(url);
+    let data = await fetch(scheduledUrl);
+    let liveData = await fetch(liveUrl);
 
-    if (!data.ok) {
+    if (!data.ok || !liveData.ok) {
       const list = await readSportFromDB("cricket");
       if (list.length) return res.json({ success: true, data: list, stale: true });
       return res.status(apiRes.status).json({ success: false, error: `Upstream ${apiRes.status}` });
     }
     let raw = await data.json();
+    let liveRaw = await liveData.json();
     let items = raw.response.items
-    // console.log("Data1: ",raw);
+    let liveItems = liveRaw.response.items
+
+    let mergedArray = [...liveItems, ...items]
+    // console.log("Data1: ",liveRaw.response.items);
 
     // console.log(items);
+    // git rev-parse --abbrev-ref HEAD          # shows current branch
+    // git fetch origin
+    // git pull --rebase origin main            # or: git reset --hard origin/main
 
 
     let matchIdList = []
     let deliverableData = []
 
-    for (i of items) {
+    for (i of mergedArray) {
       matchIdList.push(i.match_id)
     }
-
     // console.log("MatchIDS: ",matchIdList);
 
     let url2 = `https://restapi.entitysport.com/exchange/matchesmultiodds?token=a34a487cafbb7c1a67af8d50d67a360e&match_id=${matchIdList}`;
@@ -608,45 +694,43 @@ const getDataEntity = async (req, res) => {
 
 
     for (let i = 0; i < matchIdList.length; i++) {
-      const timestampStart = items[i].timestamp_start;
-      const timestampEnd = items[i].timestamp_end;
+      const timestampStart = mergedArray[i].timestamp_start;
+      const timestampEnd = mergedArray[i].timestamp_end;
       let noOdds = response[matchIdList[i]].live_odds?.matchodds;
       if (!noOdds) {
         continue
       }
 
       let data = {
-        matchId: items[i].match_id,
+        matchId: mergedArray[i].match_id,
         sportsKey: "cricket",
-        home: items[i].teama.name,
-        away: items[i].teamb.name,
-        title: items[i].title,
-        leagueTitle: items[i].competition.title,
+        home: mergedArray[i].teama.name,
+        away: mergedArray[i].teamb.name,
+        title: mergedArray[i].title,
+        leagueTitle: mergedArray[i].competition.title,
         startTime: timestampStart, // Date (UTC)
         endTime: timestampEnd, // Date (UTC)
-        expectedCategory: items[i].format_str,
+        expectedCategory: mergedArray[i].format_str,
         marketKey: "h2h_lay",
-        bookmakerKey: items[i].oddstype,
-        start_time_ist: items[i].date_start_ist,
-        end_time_ist: items[i].date_end_ist,
+        bookmakerKey: mergedArray[i].oddstype,
+        start_time_ist: mergedArray[i].date_start_ist,
+        end_time_ist: mergedArray[i].date_end_ist,
+        status: mergedArray[i].status_str.toLowerCase(),
         odds: [{
-          name: items[i].teama.name,
+          name: mergedArray[i].teama.name,
           price: response[matchIdList[i]]?.live_odds?.matchodds.teama.back
         },
         {
-          name: items[i].teamb.name,
+          name: mergedArray[i].teamb.name,
           price: response[matchIdList[i]]?.live_odds?.matchodds.teamb.back
         }
         ],
         sessionOdds: response[matchIdList[i]]?.session_odds,
-        isLive: items[i].status == 3 ? true : false
+        isLive: mergedArray[i].status == 3 ? true : false
       }
       deliverableData.push(data)
 
     }
-
-    // console.log("All good till here!");
-
 
     let changedData = await upsertOddsBatch("cricket", deliverableData);
     // console.log(changedData);
@@ -654,10 +738,7 @@ const getDataEntity = async (req, res) => {
     const list = await readSportFromDB("cricket");
     memCache.set("cricket", { ts: Date.now(), data: list });
     res.status(200).json({ success: true, data: list, stale: true })
-    // return res.json({ success: true, data: list });
 
-    // console.log("DeliverableData: ",deliverableData);
-    // console.log(raw2.response);
   } catch (error) {
 
   }
@@ -676,8 +757,75 @@ exports.baseball = (req, res) => handleSport(req, res, 'baseball');
 exports.basketball = (req, res) => handleSport(req, res, 'basketball_nba');
 
 // ------------------------- Live endpoint -------------------------
+function isNewerThan(date, minutes = 5) {
+  return Date.now() - new Date(date).getTime() <= minutes * 60 * 1000;
+}
 
-exports.live = async (req, res) => {
+exports.cricketLive = async (req, res) => {
+  try {
+    const result = {};
+    let liveUrl = "https://restapi.entitysport.com/exchange/matches/?status=3&token=a34a487cafbb7c1a67af8d50d67a360e";
+
+    try {
+      // Step 1: pull fresh (<= 5min old) rows from DB
+      let rows = await Matchs.find({
+        sport: "cricket",
+        status: "live",
+      }).select('odds matchId');
+
+      let freshData = [];
+      let oldData = [];
+      let matchIdList = [];
+
+      rows.forEach(o => {
+        if (isNewerThan(o.fetchedAt, 5)) {
+          freshData.push(o);
+        }
+        oldData.push(o)
+        matchIdList.push(o.matchId);
+      });
+
+      let liveOdds = `https://restapi.entitysport.com/exchange/matchesmultiodds?token=a34a487cafbb7c1a67af8d50d67a360e&match_id=${matchIdList}`
+
+      // Step 2: if none fresh, hit upstream then requery
+      if (freshData.length === 0) {
+        try {
+          let freshOdds = await fetch(liveOdds);
+          let freshOddsData = await freshOdds.json();
+          let saveData = await upsertLiveOddsBatch("cricket", freshOdds, matchIdList)
+        } catch (err) {
+          console.error(`[odds.live] fetch fail for ${sport}:`, err.message);
+          rows = []; // keep going; other sports may still succeed
+        }
+      }
+      else if (oldData.length != 0) {
+        try {
+          let freshOdds = await fetch(liveOdds);
+          let freshOddsData = await freshOdds.json();
+          let saveData = await upsertLiveOddsBatch("cricket", freshOdds, matchIdList)
+        } catch (err) {
+          console.error(`[odds.live] fetch fail for ${sport}:`, err.message);
+          rows = []; // keep going; other sports may still succeed
+        }
+      }
+
+      let oddsData = await readLiveSportFromDB("cricket")
+      res.status(200).json({ ok: true, data: oddsData, stale: true })
+
+    } catch (e) {
+      console.error(`[odds.live] error for cricket:`, e);
+      result["cricket"] = [];
+    }
+
+    return res.json({ success: true, data: result });
+  } catch (e) {
+    console.error('[odds.live] fatal:', e);
+    return res.status(500).json({ success: false, error: 'Failed to fetch live odds' });
+  }
+};
+
+
+exports.otherLive = async (req, res) => {
   try {
     const result = {};
 
@@ -717,8 +865,7 @@ exports.live = async (req, res) => {
     console.error('[odds.live] fatal:', e);
     return res.status(500).json({ success: false, error: 'Failed to fetch live odds' });
   }
-};
-
+}
 
 // Fetch odds for a single matchId (optionally provide sport via :sport param / query / body)
 exports.matchOdds = async (req, res) => {
