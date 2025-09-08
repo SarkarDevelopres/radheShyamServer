@@ -640,16 +640,16 @@ const getDataEntity = async (req, res) => {
     const inMem = memCache.get("cricket");
     console.log("InMem: ", inMem);
 
-    // if (inMem && (Date.now() - inMem.ts) < 10_000 && inMem.data.length > 0) {
-    //   return res.json({ success: true, data: inMem.data });
-    // }
-    // if (await isDBFresh("cricket")) {
-    //   console.log("I went here");
+    if (inMem && (Date.now() - inMem.ts) < 10_000 && inMem.data.length > 0) {
+      return res.json({ success: true, data: inMem.data });
+    }
+    if (await isDBFresh("cricket")) {
+      console.log("I went here");
 
-    //   const list = await readSportFromDB("cricket");
-    //   memCache.set("cricket", { ts: Date.now(), data: list });
-    //   return res.json({ success: true, data: list });
-    // }
+      const list = await readSportFromDB("cricket");
+      memCache.set("cricket", { ts: Date.now(), data: list });
+      return res.json({ success: true, data: list });
+    }
 
     let scheduledUrl = "https://restapi.entitysport.com/exchange/matches/?status=1&token=a34a487cafbb7c1a67af8d50d67a360e";
     let liveUrl = "https://restapi.entitysport.com/exchange/matches/?status=3&token=a34a487cafbb7c1a67af8d50d67a360e";
