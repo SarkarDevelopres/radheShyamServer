@@ -238,6 +238,18 @@ async function fetchOddsBatch(sport, matchIds) {
     return docs;
 }
 
+// // add near your other helpers
+async function fetchCompletedCricketIds() {
+  const url = `https://restapi.entitysport.com/exchange/matches/?status=2&token=a34a487cafbb7c1a67af8d50d67a360e`;
+  const res = await fetch(url);
+  if (!res.ok) return [];
+  const json = await res.json();
+  const items = json?.response?.items || [];
+  // normalize to string to match your stored matchId usage everywhere
+  return items.map(it => String(it.match_id)).filter(Boolean);
+}
+
+
 // ---------------------------------------------------------------
 
 async function runFetchAndMaterialize() {
@@ -308,15 +320,35 @@ async function runFetchAndMaterialize() {
 }
 
 
+// replace your current runSettlement with this
 async function runSettlement() {
-    await connect();
-    // find completed but not settled and call your existing settle logic
-    // leave simple for tomorrow; even a stub is okay
-    console.log('[worker] settlement tick (stub)');
+  await connect();
+
+  // 1) fetch completed (status=2) cricket matches from provider
+  const completedIds = await withTimeout(fetchCompletedCricketIds(), 20_000, 'completed:cricket');
+  if (!completedIds.length) {
+    console.log('[settle] no completed cricket matches from provider');
+    return;
+  }
+
+  // 2) mark as completed in our DB if we have them (and avoid useless writes)
+  // NOTE: if you stored matchId as a Number, remove the String() above and cast here instead.
+  const filter = {
+    sport: 'cricket',
+    matchId: { $in: completedIds },
+    status: { $ne: 'completed' },           // only flip those not yet completed
+  };
+  const update = {
+    $set: { status: 'completed', updatedAt: new Date() },
+  };
+
+  const res = await Matchs.updateMany(filter, update);
+  console.log('[settle] cricket completed → matched:', res.matchedCount ?? res.n, ' modified:', res.modifiedCount ?? res.nModified);
 }
 
+
 setInterval(runFetchAndMaterialize, 2 * 60 * 1000);
-setInterval(runSettlement, 30 * 60 * 1000);
+setInterval(runSettlement, 15 * 60 * 1000);
 
 // first run now
 runFetchAndMaterialize().catch(console.error);

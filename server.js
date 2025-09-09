@@ -5,6 +5,7 @@ const cors = require('cors');
 const http = require('http');
 const path = require('path');
 const mongoose = require('mongoose');
+// const { connectEntity } = require('./entityLogger');
 
 const connectDB = require('./config/connectDB'); // must return a Promise!
 const authenticateUser = require('./middlewares/authenticateUser');
@@ -17,6 +18,16 @@ mongoose.set('bufferCommands', false); // fail fast instead of buffering
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const debouncers = new Map();
+function debounceBroadcast(matchId, payload, delay = 120) {
+  clearTimeout(debouncers.get(matchId));
+  const t = setTimeout(() => {
+    const io = getIO();
+    io.to(`live:match:${matchId}`).emit('score:update', payload);
+  }, delay);
+  debouncers.set(matchId, t);
+}
 
 function startWorker(file) {
   const worker = new Worker(file);
@@ -60,12 +71,23 @@ async function main() {
   await connectDB(); // must resolve only when connected
   console.log('[db] connected');
 
+  // connectEntity();
+
+
   const path = require('path');
   startWorker(path.resolve(__dirname, 'workers/worker.js'));
 
   // 2) Only then start HTTP & sockets (which start the game engines)
   const server = http.createServer(app);
   attachSocket(server);
+
+  // connectEntity((matchId, latestSnapshot) => {
+  //   // emit immediately:
+  //   // getIO().to(`live:match:${matchId}`).emit('score:update', latestSnapshot);
+
+  //   // or coalesce fast bursts (recommended):
+  //   debounceBroadcast(matchId, latestSnapshot);
+  // });
 
   const PORT = process.env.PORT || 4000;
   server.listen(PORT, '0.0.0.0', () => {
