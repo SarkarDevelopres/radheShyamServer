@@ -138,10 +138,10 @@ function connectEntity(onUpdate) {
         let teamBName = msg.response.match_info.teamb.name;
         let teamBatting = msg.response.live.team_batting;
         let teamBowling = msg.response.live.team_bowling;
-        // console.log(msg.response.live);
         // console.log(msg.response.match_info.teama.name);
         onUpdate(matchId, { kind: 'snapshot', data: {liveOdds,liveScore,teamData:{teama:teamAName,teamb:teamBName},batBowl:{batting:teamBatting, bowling:teamBowling}} });
       } else if (msg?.response?.ball_event || msg?.response?.data?.over) {
+        console.log(msg);
         // console.log('[Entity ▶ BALL]', summarize(msg));
         onUpdate(matchId, { kind: 'ball', data: msg.response });
       } else if (DEBUG) {
