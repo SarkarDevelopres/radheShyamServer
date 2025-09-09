@@ -136,9 +136,11 @@ function connectEntity(onUpdate) {
         let liveOdds = msg.response.live_odds;
         let teamAName = msg.response.match_info.teama.name;
         let teamBName = msg.response.match_info.teamb.name;
-        // console.log(msg);
-        console.log(msg.response.match_info.teama.name);
-        onUpdate(matchId, { kind: 'snapshot', data: {liveOdds,liveScore,teamData:{teama:teamAName,teamb:teamBName}} });
+        let teamBatting = msg.response.live.team_batting;
+        let teamBowling = msg.response.live.team_bowling;
+        // console.log(msg.response.live);
+        // console.log(msg.response.match_info.teama.name);
+        onUpdate(matchId, { kind: 'snapshot', data: {liveOdds,liveScore,teamData:{teama:teamAName,teamb:teamBName},batBowl:{batting:teamBatting, bowling:teamBowling}} });
       } else if (msg?.response?.ball_event || msg?.response?.data?.over) {
         // console.log('[Entity ▶ BALL]', summarize(msg));
         onUpdate(matchId, { kind: 'ball', data: msg.response });
