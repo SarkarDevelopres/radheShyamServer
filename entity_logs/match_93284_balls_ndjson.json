@@ -1,0 +1,633 @@
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "0.1",
+      "ball": "1",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142793",
+      "bowler_id": "132637",
+      "striker_name": "Usman Shah",
+      "bowler_name": "Abdul Khaliq Khan"
+    }
+  },
+  "timestamp": 1757417538
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "dot",
+    "code": "26",
+    "match_id": "93284",
+    "data": {
+      "over": "0.2",
+      "ball": "2",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "112826",
+      "bowler_id": "132637",
+      "striker_name": "Asif Khan",
+      "bowler_name": "Abdul Khaliq Khan"
+    }
+  },
+  "timestamp": 1757417547
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "0.3",
+      "ball": "3",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "112826",
+      "bowler_id": "132637",
+      "striker_name": "Asif Khan",
+      "bowler_name": "Abdul Khaliq Khan"
+    }
+  },
+  "timestamp": 1757417633
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "0.6",
+      "ball": "6",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "112965",
+      "bowler_id": "132637",
+      "striker_name": "Hammad Ifraq",
+      "bowler_name": "Abdul Khaliq Khan"
+    }
+  },
+  "timestamp": 1757417687
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "1.1",
+      "ball": "1",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "112965",
+      "bowler_id": "132319",
+      "striker_name": "Hammad Ifraq",
+      "bowler_name": "Umair Shakeel"
+    }
+  },
+  "timestamp": 1757417846
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "1.2",
+      "ball": "2",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142793",
+      "bowler_id": "132319",
+      "striker_name": "Usman Shah",
+      "bowler_name": "Umair Shakeel"
+    }
+  },
+  "timestamp": 1757417850
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "1.3",
+      "ball": "3",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142793",
+      "bowler_id": "132319",
+      "striker_name": "Usman Shah",
+      "bowler_name": "Umair Shakeel"
+    }
+  },
+  "timestamp": 1757417868
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "1.4",
+      "ball": "4",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "112965",
+      "bowler_id": "132319",
+      "striker_name": "Hammad Ifraq",
+      "bowler_name": "Umair Shakeel"
+    }
+  },
+  "timestamp": 1757417895
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "1.5",
+      "ball": "5",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "112965",
+      "bowler_id": "132319",
+      "striker_name": "Hammad Ifraq",
+      "bowler_name": "Umair Shakeel"
+    }
+  },
+  "timestamp": 1757417973
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "1.6",
+      "ball": "6",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "112965",
+      "bowler_id": "132319",
+      "striker_name": "Hammad Ifraq",
+      "bowler_name": "Umair Shakeel"
+    }
+  },
+  "timestamp": 1757418018
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Over",
+    "code": "23",
+    "match_id": "93284",
+    "data": {}
+  },
+  "timestamp": 1757418021
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "3.3",
+      "ball": "3",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142793",
+      "bowler_id": "90969",
+      "striker_name": "Usman Shah",
+      "bowler_name": "Narayan Saishiv"
+    }
+  },
+  "timestamp": 1757418381
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "3.4",
+      "ball": "4",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142793",
+      "bowler_id": "90969",
+      "striker_name": "Usman Shah",
+      "bowler_name": "Narayan Saishiv"
+    }
+  },
+  "timestamp": 1757418427
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Caught",
+    "code": "43",
+    "match_id": "93284",
+    "data": {
+      "over": "3.4",
+      "ball": "4",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "112965",
+      "bowler_id": "90969",
+      "striker_name": "Hammad Ifraq",
+      "bowler_name": "Narayan Saishiv",
+      "dismissed_player_id": "112965",
+      "dismissed_player_name": "Hammad Ifraq"
+    }
+  },
+  "timestamp": 1757418443
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "New Batter Amanullah Rafiqi",
+    "code": "2",
+    "match_id": "93284",
+    "data": {
+      "over": "3.5",
+      "ball": "5",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142963",
+      "bowler_id": "90969",
+      "striker_name": "Amanullah Rafiqi",
+      "bowler_name": "Narayan Saishiv"
+    }
+  },
+  "timestamp": 1757418486
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "3.5",
+      "ball": "5",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142963",
+      "bowler_id": "90969",
+      "striker_name": "Amanullah Rafiqi",
+      "bowler_name": "Narayan Saishiv"
+    }
+  },
+  "timestamp": 1757418491
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "3.6",
+      "ball": "6",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142963",
+      "bowler_id": "90969",
+      "striker_name": "Amanullah Rafiqi",
+      "bowler_name": "Narayan Saishiv"
+    }
+  },
+  "timestamp": 1757418493
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Over",
+    "code": "23",
+    "match_id": "93284",
+    "data": {}
+  },
+  "timestamp": 1757418515
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "New Bowler Sanju Sanjeev",
+    "code": "3",
+    "match_id": "93284",
+    "data": {
+      "over": "4.1",
+      "ball": "1",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142963",
+      "bowler_id": "105756",
+      "striker_name": "Amanullah Rafiqi",
+      "bowler_name": "Sanju Sanjeev"
+    }
+  },
+  "timestamp": 1757418586
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "4.1",
+      "ball": "1",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142963",
+      "bowler_id": "105756",
+      "striker_name": "Amanullah Rafiqi",
+      "bowler_name": "Sanju Sanjeev"
+    }
+  },
+  "timestamp": 1757418700
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "wide",
+    "code": "27",
+    "match_id": "93284",
+    "data": {
+      "over": "4.2",
+      "ball": "2",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142793",
+      "bowler_id": "105756",
+      "striker_name": "Usman Shah",
+      "bowler_name": "Sanju Sanjeev"
+    }
+  },
+  "timestamp": 1757418702
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "4.3",
+      "ball": "4",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142793",
+      "bowler_id": "105756",
+      "striker_name": "Usman Shah",
+      "bowler_name": "Sanju Sanjeev"
+    }
+  },
+  "timestamp": 1757418713
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "4.4",
+      "ball": "5",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142963",
+      "bowler_id": "105756",
+      "striker_name": "Amanullah Rafiqi",
+      "bowler_name": "Sanju Sanjeev"
+    }
+  },
+  "timestamp": 1757418716
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "4.5",
+      "ball": "6",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142963",
+      "bowler_id": "105756",
+      "striker_name": "Amanullah Rafiqi",
+      "bowler_name": "Sanju Sanjeev"
+    }
+  },
+  "timestamp": 1757418825
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "4.6",
+      "ball": "7",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142963",
+      "bowler_id": "105756",
+      "striker_name": "Amanullah Rafiqi",
+      "bowler_name": "Sanju Sanjeev"
+    }
+  },
+  "timestamp": 1757418863
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "4.6",
+      "ball": "8",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142963",
+      "bowler_id": "105756",
+      "striker_name": "Amanullah Rafiqi",
+      "bowler_name": "Sanju Sanjeev"
+    }
+  },
+  "timestamp": 1757418865
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Over",
+    "code": "23",
+    "match_id": "93284",
+    "data": {}
+  },
+  "timestamp": 1757418872
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "2",
+    "code": "36",
+    "match_id": "93284",
+    "data": {
+      "over": "5.1",
+      "ball": "1",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142793",
+      "bowler_id": "90969",
+      "striker_name": "Usman Shah",
+      "bowler_name": "Narayan Saishiv"
+    }
+  },
+  "timestamp": 1757419036
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "5.3",
+      "ball": "3",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142793",
+      "bowler_id": "90969",
+      "striker_name": "Usman Shah",
+      "bowler_name": "Narayan Saishiv"
+    }
+  },
+  "timestamp": 1757419043
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "5.4",
+      "ball": "4",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142963",
+      "bowler_id": "90969",
+      "striker_name": "Amanullah Rafiqi",
+      "bowler_name": "Narayan Saishiv"
+    }
+  },
+  "timestamp": 1757419051
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "5.5",
+      "ball": "5",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142793",
+      "bowler_id": "90969",
+      "striker_name": "Usman Shah",
+      "bowler_name": "Narayan Saishiv"
+    }
+  },
+  "timestamp": 1757419053
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Ball Chalu",
+    "code": "24",
+    "match_id": "93284",
+    "data": {
+      "over": "5.6",
+      "ball": "6",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142793",
+      "bowler_id": "90969",
+      "striker_name": "Usman Shah",
+      "bowler_name": "Narayan Saishiv"
+    }
+  },
+  "timestamp": 1757419059
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Caught",
+    "code": "43",
+    "match_id": "93284",
+    "data": {
+      "over": "5.6",
+      "ball": "6",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142963",
+      "bowler_id": "90969",
+      "striker_name": "Amanullah Rafiqi",
+      "bowler_name": "Narayan Saishiv",
+      "dismissed_player_id": "142963",
+      "dismissed_player_name": "Amanullah Rafiqi"
+    }
+  },
+  "timestamp": 1757419069
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "Over",
+    "code": "23",
+    "match_id": "93284",
+    "data": {}
+  },
+  "timestamp": 1757419073
+}
+{
+  "status": "ok",
+  "response": {
+    "ball_event": "New Batter Syed Amir Shah",
+    "code": "2",
+    "match_id": "93284",
+    "data": {
+      "over": "6.1",
+      "ball": "1",
+      "iid": "202274",
+      "inn_num": "1",
+      "striker_id": "142963",
+      "bowler_id": "90969",
+      "striker_name": "Amanullah Rafiqi",
+      "bowler_name": "Narayan Saishiv"
+    }
+  },
+  "timestamp": 1757419125
+}

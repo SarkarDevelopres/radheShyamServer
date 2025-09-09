@@ -4,351 +4,352 @@ const mongoose = require('mongoose');
 const Matchs = require('../db/models/match');
 const Odds = require('../db/models/odds');
 
-async function connect() {
-    if (mongoose.connection.readyState) return;
-    await mongoose.connect(process.env.DB_URI, {
-        dbName: 'RadheShyamExch',
-        readPreference: 'primary',
-    });
-}
+// ---- Mongoose setup (single connection) ----
+mongoose.set('bufferCommands', false);
+mongoose.connection.on('error', (e) => console.error('[db] error:', e.message));
+mongoose.connection.on('disconnected', () => console.error('[db] disconnected'));
+mongoose.connection.on('reconnected', () => console.log('[db] reconnected'));
 
+// ---- In-memory (optional helper cache) ----
+const memCache = new Map();
 
-
-const memCache = new Map()
-
+// ---- Constants ----
 const MIN = 60 * 1000;
-
-const SPORTS = ["cricket", "soccer", "tennis", "basketball_nba", "baseball"]; // keep values matching your provider
+const SPORTS = ['cricket', 'soccer', 'tennis', 'basketball_nba', 'baseball'];
 
 const DURATIONS = {
-    SOCCER: 120 * MIN,
-    TENNIS: 150 * MIN,
-    BASKETBALL: 135 * MIN,
-    BASEBALL: 180 * MIN,
+  SOCCER: 120 * MIN,
+  TENNIS: 150 * MIN,
+  BASKETBALL: 135 * MIN,
+  BASEBALL: 180 * MIN,
 };
 
-// utilitiy functions
-
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
+// ---- Utilities ----
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const fetch = global.fetch || ((...args) => import('node-fetch').then(({ default: f }) => f(...args)));
 
-
 async function withTimeout(promise, ms, tag = 'op') {
-    let t;
-    const timeout = new Promise((_, rej) => {
-        t = setTimeout(() => rej(new Error(`${tag} timed out after ${ms}ms`)), ms);
-    });
-    try {
-        return await Promise.race([promise, timeout]);
-    }
-    finally { clearTimeout(t); }
-}
-
-function changeFromIsoToEpoch(startTime) {
-    let date = new Date(startTime);
-    let sinceEpochTime = date.getTime();
-    return sinceEpochTime;
+  let t;
+  const timeout = new Promise((_, rej) => {
+    t = setTimeout(() => rej(new Error(`${tag} timed out after ${ms}ms`)), ms);
+  });
+  try { return await Promise.race([promise, timeout]); }
+  finally { clearTimeout(t); }
 }
 
 function normalizeIsoToDate(isoLike) {
-    if (isoLike instanceof Date) {
-        return Number.isNaN(isoLike.getTime()) ? null : isoLike;
-    }
-    const iso = typeof isoLike === "string" && /[zZ]|[+\-]\d{2}:?\d{2}$/.test(isoLike) ? isoLike : `${isoLike}Z`;
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? null : d;
+  if (isoLike instanceof Date) return Number.isNaN(isoLike.getTime()) ? null : isoLike;
+  const iso = typeof isoLike === 'string' && /[zZ]|[+\-]\d{2}:?\d{2}$/.test(isoLike) ? isoLike : `${isoLike}Z`;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 function displayTimeIST(input) {
-    const d = input instanceof Date ? input : new Date(input);
-    if (Number.isNaN(d.getTime())) return "";
-    const fmt = new Intl.DateTimeFormat("en-GB", {
-        timeZone: "Asia/Kolkata",
-        day: "2-digit", month: "short", year: "numeric",
-        hour: "2-digit", minute: "2-digit", hour12: false
-    });
-    const parts = Object.fromEntries(fmt.formatToParts(d).map(p => [p.type, p.value]));
-    return `${parts.day} ${parts.month} ${parts.year} ${parts.hour}:${parts.minute}`;
+  const d = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(d.getTime())) return '';
+  const fmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(d).map(p => [p.type, p.value]));
+  return `${parts.day} ${parts.month} ${parts.year} ${parts.hour}:${parts.minute}`;
 }
 
-
-
 function detectCategory(sportParam, m) {
-    const sk = String(m?.sport_key || sportParam || "").toLowerCase();
-    const st = String(m?.sport_title || m?.sports_title || "").toLowerCase();
-
-    if (sk.includes("soccer") || st.includes("soccer") || st.includes("football")) return "SOCCER";
-    if (sk.includes("tennis") || st.includes("tennis")) return "TENNIS";
-    if (sk.includes("basketball") || st.includes("basketball")) return "BASKETBALL";
-    if (sk.includes("baseball") || st.includes("baseball")) return "BASEBALL";
-    if (sk.includes("ice_hockey") || sk.includes("icehockey") || st.includes("ice hockey") || sk.includes("nhl") || st.includes("nhl")) return "ICE_HOCKEY";
-
-    return null;
+  const sk = String(m?.sport_key || sportParam || '').toLowerCase();
+  const st = String(m?.sport_title || m?.sports_title || '').toLowerCase();
+  if (sk.includes('soccer') || st.includes('soccer') || st.includes('football')) return 'SOCCER';
+  if (sk.includes('tennis') || st.includes('tennis')) return 'TENNIS';
+  if (sk.includes('basketball') || st.includes('basketball')) return 'BASKETBALL';
+  if (sk.includes('baseball') || st.includes('baseball')) return 'BASEBALL';
+  if (sk.includes('ice_hockey') || sk.includes('icehockey') || st.includes('ice hockey') || sk.includes('nhl') || st.includes('nhl')) return 'ICE_HOCKEY';
+  return null;
 }
 
 function expectedEnd(commenceTimeIsoOrDate, category) {
-    const start = normalizeIsoToDate(commenceTimeIsoOrDate);
-    if (!start || !category || !DURATIONS[category]) return null;
-    return new Date(start.getTime() + DURATIONS[category]);
+  const start = normalizeIsoToDate(commenceTimeIsoOrDate);
+  if (!start || !category || !DURATIONS[category]) return null;
+  return new Date(start.getTime() + DURATIONS[category]);
 }
-// -------------- you fill these 2 with your API code --------------
+
+// ---- Provider calls ----
 async function fetchMatchesFromProvider(sport) {
-    if (sport === "cricket") {
-        const scheduledUrl = "https://restapi.entitysport.com/exchange/matches/?status=1&token=a34a487cafbb7c1a67af8d50d67a360e";
-        const liveUrl = "https://restapi.entitysport.com/exchange/matches/?status=3&token=a34a487cafbb7c1a67af8d50d67a360e";
+  if (sport === 'cricket') {
+    const scheduledUrl = `https://restapi.entitysport.com/exchange/matches/?status=1&token=${process.env.ENTITY_TOKEN}`;
+    const liveUrl =      `https://restapi.entitysport.com/exchange/matches/?status=3&token=${process.env.ENTITY_TOKEN}`;
+    const [data, liveData] = await Promise.all([fetch(scheduledUrl), fetch(liveUrl)]);
+    if (!data.ok || !liveData.ok) return [];
 
-        const [data, liveData] = await Promise.all([fetch(scheduledUrl), fetch(liveUrl)]);
-        if (!data.ok || !liveData.ok) return [];
+    const raw = await data.json();
+    const liveRaw = await liveData.json();
+    const merged = [...(liveRaw.response?.items || []), ...(raw.response?.items || [])];
 
-        const raw = await data.json();
-        const liveRaw = await liveData.json();
-        const merged = [...(liveRaw.response?.items || []), ...(raw.response?.items || [])];
-
-        const matchList = [];
-        for (const it of merged) {
-            if (!it || it.oddstype === "") continue;
-
-            const start = it.date_start; // ISO string or Date-like
-            const end = it.end ?? it.date_end ?? null;
-
-            const startTime = normalizeIsoToDate(start);
-            const endTime = end ? normalizeIsoToDate(end) : null;
-
-            matchList.push({
-                matchId: it.match_id,
-                sport: "cricket",
-                sportKey: "cricket",
-                teamHome: it.teama?.name,
-                teamAway: it.teamb?.name,
-                title: it.competition?.title,
-                start_time: startTime ? startTime.getTime() : null,
-                end_time: endTime ? endTime.getTime() : null,
-                category: it.format_str,
-                start_time_ist: startTime ? displayTimeIST(startTime) : "",
-                end_time_ist: endTime ? displayTimeIST(endTime) : "",
-                status: String(it.status_str || "").toLowerCase(), // scheduled/live/completed
-                isOdds: true,
-                sessionOdds: !!it.session_odds_available
-            });
-        }
-        return matchList;
-    }
-
-    // ---- OddsAPI branch (soccer/tennis/basketball/baseball etc.)
-    const oddsUrl =
-        `https://api.the-odds-api.com/v4/sports/${sport}/odds/?regions=uk&markets=h2h_lay&apiKey=${process.env.ODDS_API_KEY}`;
-    const apiOddsRes = await fetch(oddsUrl);
-    if (!apiOddsRes.ok) return [];
-    const odds = await apiOddsRes.json();
-
-    const now = Date.now();
     const matchList = [];
+    for (const it of merged) {
+      if (!it || it.oddstype === '') continue;
 
-    for (const o of odds || []) {
-        if (!o.bookmakers?.length) continue;
+      const start = it.date_start;
+      const end = it.end ?? it.date_end ?? null;
+      const startTime = normalizeIsoToDate(start);
+      const endTime = end ? normalizeIsoToDate(end) : null;
 
-        const startTime = normalizeIsoToDate(o.commence_time);
-        const category = detectCategory(sport, o);
-        const endTime = expectedEnd(startTime, category);
-
-        const startEpoch = startTime ? startTime.getTime() : null;
-        const endEpoch = endTime ? endTime.getTime() : null;
-
-        const isLive = startEpoch && endEpoch ? (now >= startEpoch && now < endEpoch) : false;
-        const isScheduled = startEpoch ? (now < startEpoch) : false;
-
-        matchList.push({
-            matchId: o.id,
-            sport: sport,
-            sportKey: o.sport_key,
-            teamHome: o.home_team,
-            teamAway: o.away_team,              // <-- fix
-            title: o.sport_title,
-            start_time: startEpoch,
-            end_time: endEpoch,
-            category,
-            start_time_ist: startEpoch ? displayTimeIST(startTime) : "",
-            end_time_ist: endEpoch ? displayTimeIST(endTime) : "",
-            status: isLive ? "live" : isScheduled ? "scheduled" : "completed",
-            isOdds: true,
-            sessionOdds: false
-        });
+      matchList.push({
+        matchId: String(it.match_id),
+        sport: 'cricket',
+        sportKey: 'cricket',
+        teamHome: it.teama?.name,
+        teamAway: it.teamb?.name,
+        title: it.competition?.title,
+        start_time: startTime ? startTime.getTime() : null,
+        end_time: endTime ? endTime.getTime() : null,
+        category: it.format_str,
+        start_time_ist: startTime ? displayTimeIST(startTime) : '',
+        end_time_ist: endTime ? displayTimeIST(endTime) : '',
+        status: String(it.status_str || '').toLowerCase(), // scheduled/live/completed
+        isOdds: true,
+        sessionOdds: !!it.session_odds_available
+      });
     }
     return matchList;
+  }
+
+  // OddsAPI branch
+  const oddsUrl =
+    `https://api.the-odds-api.com/v4/sports/${sport}/odds/?regions=uk&markets=h2h,h2h_lay&apiKey=${process.env.ODDS_API_KEY}`;
+  const apiOddsRes = await fetch(oddsUrl);
+  if (!apiOddsRes.ok) return [];
+  const odds = await apiOddsRes.json();
+
+  const now = Date.now();
+  const matchList = [];
+
+  for (const o of odds || []) {
+    if (!o.bookmakers?.length) continue;
+
+    const startTime = normalizeIsoToDate(o.commence_time);
+    const category = detectCategory(sport, o);
+    const endTime = expectedEnd(startTime, category);
+
+    const startEpoch = startTime ? startTime.getTime() : null;
+    const endEpoch = endTime ? endTime.getTime() : null;
+
+    const isLive = startEpoch && endEpoch ? (now >= startEpoch && now < endEpoch) : false;
+    const isScheduled = startEpoch ? (now < startEpoch) : false;
+
+    matchList.push({
+      matchId: String(o.id),
+      sport,
+      sportKey: o.sport_key,
+      teamHome: o.home_team,
+      teamAway: o.away_team,
+      title: o.sport_title || o.title,
+      start_time: startEpoch,
+      end_time: endEpoch,
+      category,
+      start_time_ist: startEpoch ? displayTimeIST(startTime) : '',
+      end_time_ist: endEpoch ? displayTimeIST(endTime) : '',
+      status: isLive ? 'live' : isScheduled ? 'scheduled' : 'completed',
+      isOdds: true,
+      sessionOdds: false
+    });
+  }
+  return matchList;
 }
 
-async function fetchOddsBatch(sport, matchIds) {
-    if (sport === "cricket") {
-        const url = `https://restapi.entitysport.com/exchange/matchesmultiodds?token=a34a487cafbb7c1a67af8d50d67a360e&match_id=${matchIds.join(",")}`;
-        const res = await fetch(url);
-        if (!res.ok) return [];
-        const raw = await res.json();
-        if (raw.status !== "ok") return [];
+async function fetchOddsBatch(sport, matchIds, nameById) {
+  if (sport === 'cricket') {
+    const url = `https://restapi.entitysport.com/exchange/matchesmultiodds?token=${process.env.ENTITY_TOKEN}&match_id=${matchIds.join(',')}`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const raw = await res.json();
+    if (raw.status !== 'ok') return [];
 
-        const nameById = memCache.get('nameById') || new Map();
-        const response = raw.response || {};
-        const oddsList = [];
+    const response = raw.response || {};
+    const oddsList = [];
 
-        for (const mid of matchIds) {
-            const r = response[mid];
-            if (!r || !r.live_odds || !r.live_odds.matchodds) continue;
+    for (const mid of matchIds) {
+      const r = response[mid];
+      const mo = r?.live_odds?.matchodds;
+      if (!mo) continue;
 
-            const names = nameById.get(String(mid)) || {};
-            oddsList.push({
-                matchId: mid,                               // <-- REQUIRED for upsert
-                sport: sport,
-                sportKey: sport,
-                bookmakerKey: names.bookmakerKey || "entity",
-                marketKey: "h2h",
-                isBet: false,
-                provider: "entity-sport",
-                odds: [
-                    { name: names.teama || "Team A", price: r.live_odds.matchodds?.teama?.back },
-                    { name: names.teamb || "Team B", price: r.live_odds.matchodds?.teamb?.back }
-                ]
-            });
-        }
-        return oddsList;
+      const names = nameById.get(String(mid)) || {};
+      const priceA = mo?.teama?.back;
+      const priceB = mo?.teamb?.back;
+      if (priceA == null || priceB == null) continue;
+
+      oddsList.push({
+        matchId: String(mid),
+        sport: sport,
+        sportKey: sport,
+        bookmakerKey: names.bookmakerKey || 'entity',
+        marketKey: 'h2h', // keep consistent with your UI/queries
+        isBet: false,
+        provider: 'entity-sport',
+        odds: [
+          { name: names.teama || 'Team A', price: priceA },
+          { name: names.teamb || 'Team B', price: priceB }
+        ]
+      });
     }
+    return oddsList;
+  }
 
-    // ---- OddsAPI branch
-    const oddsUrl =
-        `https://api.the-odds-api.com/v4/sports/${sport}/odds/?regions=uk&markets=h2h_lay&apiKey=${process.env.ODDS_API_KEY}`;
-    const apiOddsRes = await fetch(oddsUrl);
-    if (!apiOddsRes.ok) return [];
-    const odds = await apiOddsRes.json();
+  // OddsAPI branch: one doc per market
+  const oddsUrl =
+    `https://api.the-odds-api.com/v4/sports/${sport}/odds/?regions=uk&markets=h2h,h2h_lay&apiKey=${process.env.ODDS_API_KEY}`;
+  const apiOddsRes = await fetch(oddsUrl);
+  if (!apiOddsRes.ok) return [];
+  const odds = await apiOddsRes.json();
 
-    const docs = [];
-    for (const o of odds || []) {
-        if (!o.bookmakers?.length) continue;
-        docs.push({
-            matchId: o.id,
-            sport: sport,
-            sportKey: o.sport_key,
-            bookmakerKey: o.bookmakers[0].key,
-            marketKey: "h2h",
-            isBet: false,
-            sessionOdds: false,
-            provider: "the-odds-api",
-            odds: o.bookmakers[0].markets[0].outcomes
-        });
-        
+  const docs = [];
+  for (const o of odds || []) {
+    if (!o.bookmakers?.length) continue;
+    const bk = o.bookmakers[0];
+    for (const mkt of bk.markets || []) {
+      if (!mkt?.key) continue;
+      docs.push({
+        matchId: String(o.id),
+        sport,
+        sportKey: o.sport_key,
+        bookmakerKey: bk.key,
+        marketKey: mkt.key,           // e.g., 'h2h' or 'h2h_lay'
+        isBet: false,
+        sessionOdds: false,
+        provider: 'the-odds-api',
+        odds: mkt                      // store just this market
+      });
     }
-    return docs;
+  }
+  // if you only want odds for `matchIds`, filter here:
+  return docs.filter(d => matchIds.includes(d.matchId));
 }
 
-// // add near your other helpers
 async function fetchCompletedCricketIds() {
-  const url = `https://restapi.entitysport.com/exchange/matches/?status=2&token=a34a487cafbb7c1a67af8d50d67a360e`;
+  const url = `https://restapi.entitysport.com/exchange/matches/?status=2&token=${process.env.ENTITY_TOKEN}`;
   const res = await fetch(url);
   if (!res.ok) return [];
   const json = await res.json();
   const items = json?.response?.items || [];
-  // normalize to string to match your stored matchId usage everywhere
   return items.map(it => String(it.match_id)).filter(Boolean);
 }
 
-
-// ---------------------------------------------------------------
-
+// ---- Jobs ----
 async function runFetchAndMaterialize() {
-    await connect();
-    console.log('[mongo] uri      =', process.env.DB_URI);
-    console.log('[mongo] host/db  =', mongoose.connection.host, '/', mongoose.connection.name);
+  console.log('[mongo] host/db =', mongoose.connection.host, '/', mongoose.connection.name);
+  const started = Date.now();
+  let totalMatches = 0, totalOdds = 0;
 
-    const before = await Odds.countDocuments({});
-    console.log('[mongo] odds count BEFORE =', before);
+  // accumulate names across sports (avoid overwriting with empty)
+  const globalNameById = memCache.get('nameById') || new Map();
 
-    const started = Date.now();
-    let totalMatches = 0, totalOdds = 0;
+  for (const sport of SPORTS) {
+    try {
+      console.log(`[worker] → ${sport}: fetching fixtures`);
+      const matches = await withTimeout(fetchMatchesFromProvider(sport), 25_000, `fixtures:${sport}`);
 
-    for (const sport of SPORTS) {
-        try {
-            console.log(`[worker] -> ${sport} fetching data`);
-            const matches = await withTimeout(fetchMatchesFromProvider(sport), 20_000, `fixtures:${sport}`);
+      // upsert matches
+      if (matches.length) {
+        const matchOps = matches.map(m => ({
+          updateOne: {
+            filter: { matchId: m.matchId },
+            update: { $set: { ...m, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
+            upsert: true
+          }
+        }));
+        const r = await Matchs.bulkWrite(matchOps, { ordered: false });
+        console.log('[matches.bulkWrite] matched=', r.matchedCount, ' modified=', r.modifiedCount, ' upserted=', r.upsertedCount);
+      }
+      totalMatches += matches.length;
 
-            // upsert matches
-            if (matches.length) {
-                let matchRes = await Matchs.bulkWrite(matches.map(m => ({
-                    updateOne: {
-                        filter: { matchId: m.matchId },
-                        update: { $set: { ...m, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
-                        upsert: true
-                    }
-                })), { ordered: false });
-                console.log('[odds.bulkWrite] ack=', matchRes);
-            }
-            totalMatches += matches.length;
+      // merge into global map
+      for (const m of matches) {
+        globalNameById.set(String(m.matchId), {
+          teama: m.teamHome,
+          teamb: m.teamAway,
+          bookmakerKey: m.bookmakerKey || (sport === 'cricket' ? 'entity' : undefined)
+        });
+      }
 
-            // build id->names map and cache
-            const nameById = new Map(matches.map(m => [
-                String(m.matchId),
-                { teama: m.teamHome, teamb: m.teamAway, bookmakerKey: m.bookmakerKey || (sport === 'cricket' ? 'entity' : undefined) }
-            ]));
-            memCache.set('nameById', nameById);
+      const active = matches.filter(f => f.status === 'live' || f.status === 'scheduled');
+      const ids = active.map(a => a.matchId);
 
-            const active = matches.filter(f => f.status === 'live' || f.status === 'scheduled');
-            const ids = active.map(a => a.matchId);
+      if (ids.length) {
+        console.log(`[worker] → ${sport}: fetching odds for ${ids.length}`);
+        const oddDocs = await withTimeout(fetchOddsBatch(sport, ids, globalNameById), 25_000, `odds:${sport}`);
 
-            if (ids.length) {
-                const oddDocs = await withTimeout(fetchOddsBatch(sport, ids), 20_000, `odds:${sport}`);
-                if (oddDocs.length) {
-                    let oddRes = await Odds.bulkWrite(oddDocs.map(d => ({
-                        updateOne: {
-                            filter: { matchId: d.matchId, bookmakerKey: d.bookmakerKey, marketKey: d.marketKey, sport:sport },
-                            update: {
-                                $set: { odds: d.odds, updatedAt: new Date() },
-                                $setOnInsert: { createdAt: new Date(), matchId: d.matchId, bookmakerKey: d.bookmakerKey, marketKey: d.marketKey, sport:sport }
-                            },
-                            upsert: true
-                        }
-                    })), { ordered: false });
-                }
-                totalOdds += oddDocs.length;
-            }
-
-            await sleep(250); // gentle spacing
-
-        } catch (error) {
-            console.log(`[worker] errored: ${error.message}`);
+        if (oddDocs.length) {
+          const ops = oddDocs
+            .filter(d => d.matchId && d.bookmakerKey && d.marketKey)
+            .map(d => ({
+              updateOne: {
+                filter: { matchId: d.matchId, bookmakerKey: d.bookmakerKey, marketKey: d.marketKey, sport: d.sport },
+                update: {
+                  $set: { odds: d.odds, updatedAt: new Date() },
+                  $setOnInsert: { createdAt: new Date(), matchId: d.matchId, bookmakerKey: d.bookmakerKey, marketKey: d.marketKey, sport: d.sport }
+                },
+                upsert: true
+              }
+            }));
+          if (ops.length) {
+            const res = await Odds.bulkWrite(ops, { ordered: false });
+            console.log('[odds.bulkWrite] matched=', res.matchedCount, ' modified=', res.modifiedCount, ' upserted=', res.upsertedCount);
+          }
+          totalOdds += oddDocs.length;
         }
+      }
+
+      await sleep(250); // gentle spacing to avoid spikes
+    } catch (err) {
+      console.error(`[worker] ${sport} errored:`, err.message);
     }
-
-    console.log(`[worker] ✓ refresh done in ${Date.now() - started}ms  matches:${totalMatches} odds:${totalOdds}`);
-
-}
-
-
-// replace your current runSettlement with this
-async function runSettlement() {
-  await connect();
-
-  // 1) fetch completed (status=2) cricket matches from provider
-  const completedIds = await withTimeout(fetchCompletedCricketIds(), 20_000, 'completed:cricket');
-  if (!completedIds.length) {
-    console.log('[settle] no completed cricket matches from provider');
-    return;
   }
 
-  // 2) mark as completed in our DB if we have them (and avoid useless writes)
-  // NOTE: if you stored matchId as a Number, remove the String() above and cast here instead.
-  const filter = {
-    sport: 'cricket',
-    matchId: { $in: completedIds },
-    status: { $ne: 'completed' },           // only flip those not yet completed
-  };
-  const update = {
-    $set: { status: 'completed', updatedAt: new Date() },
-  };
+  // save merged cache once
+  memCache.set('nameById', globalNameById);
 
-  const res = await Matchs.updateMany(filter, update);
-  console.log('[settle] cricket completed → matched:', res.matchedCount ?? res.n, ' modified:', res.modifiedCount ?? res.nModified);
+  console.log(`[worker] ✓ refresh done in ${Date.now() - started}ms  matches:${totalMatches} odds:${totalOdds}`);
 }
 
+async function runSettlement() {
+  try {
+    const completedIds = await withTimeout(fetchCompletedCricketIds(), 20_000, 'completed:cricket');
+    if (!completedIds.length) {
+      console.log('[settle] no completed cricket matches from provider');
+      return;
+    }
 
-setInterval(runFetchAndMaterialize, 2 * 60 * 1000);
-setInterval(runSettlement, 15 * 60 * 1000);
+    const filter = {
+      sport: 'cricket',
+      matchId: { $in: completedIds },
+      status: { $ne: 'completed' }
+    };
+    const update = { $set: { status: 'completed', updatedAt: new Date() } };
+    const res = await Matchs.updateMany(filter, update);
+    console.log('[settle] cricket completed → matched:', res.matchedCount ?? res.n, ' modified:', res.modifiedCount ?? res.nModified);
+  } catch (e) {
+    console.error('[settle] error:', e.message);
+  }
+}
 
-// first run now
-runFetchAndMaterialize().catch(console.error);
+// ---- Boot once, schedule jobs ----
+(async () => {
+  try {
+    await mongoose.connect(process.env.DB_URI, {
+      dbName: 'RadheShyamExch',
+      readPreference: 'primary',
+    });
+    console.log('[db] connected');
+
+    // run once at startup
+    await runFetchAndMaterialize();
+
+    // schedule periodic jobs (add small jitter to avoid exact-minute stampedes)
+    const jitter = () => 500 + Math.floor(Math.random() * 1500);
+    // setInterval(runFetchAndMaterialize, 10 * MIN + jitter());
+    // setInterval(runSettlement, 30 * 1000 + jitter());
+  } catch (err) {
+    console.error('[db] connection failed:', err.message);
+    process.exit(1);
+  }
+})();

@@ -5,7 +5,9 @@ const cors = require('cors');
 const http = require('http');
 const path = require('path');
 const mongoose = require('mongoose');
-// const { connectEntity } = require('./entityLogger');
+const { connectEntityInspector } = require('./entityLogger');
+const { connectEntity } = require('./entitySocket');
+const { getIO } = require('./socket');
 
 const connectDB = require('./config/connectDB'); // must return a Promise!
 const authenticateUser = require('./middlewares/authenticateUser');
@@ -71,7 +73,7 @@ async function main() {
   await connectDB(); // must resolve only when connected
   console.log('[db] connected');
 
-  // connectEntity();
+  // connectEntityInspector();
 
 
   const path = require('path');
@@ -81,13 +83,11 @@ async function main() {
   const server = http.createServer(app);
   attachSocket(server);
 
-  // connectEntity((matchId, latestSnapshot) => {
-  //   // emit immediately:
-  //   // getIO().to(`live:match:${matchId}`).emit('score:update', latestSnapshot);
-
-  //   // or coalesce fast bursts (recommended):
-  //   debounceBroadcast(matchId, latestSnapshot);
-  // });
+  connectEntity((matchId, latestSnapshot) => {
+    // emit immediately:
+    getIO().to(`live:match:${matchId}`).emit('score:update', latestSnapshot);
+    debounceBroadcast(matchId, latestSnapshot);
+  });
 
   const PORT = process.env.PORT || 4000;
   server.listen(PORT, '0.0.0.0', () => {

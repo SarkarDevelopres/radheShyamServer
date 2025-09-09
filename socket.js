@@ -51,19 +51,19 @@ function attachSocket(server) {
     });
     // --- Live scores: client joins/leaves a match room ---
     
-    // socket.on('watch:join', (matchId) => {
-    //   if (!matchId) return;
-    //   const room = `live:match:${matchId}`;
-    //   socket.join(room);
-    //   socket.emit('watch:joined', { matchId });
-    // });
+    socket.on('watch:join', (matchId) => {
+      if (!matchId) return;
+      const room = `live:match:${matchId}`;
+      socket.join(room);
+      socket.emit('watch:joined', { matchId });
+    });
 
-    // socket.on('watch:leave', (matchId) => {
-    //   if (!matchId) return;
-    //   const room = `live:match:${matchId}`;
-    //   socket.leave(room);
-    //   socket.emit('watch:left', { matchId });
-    // });
+    socket.on('watch:leave', (matchId) => {
+      if (!matchId) return;
+      const room = `live:match:${matchId}`;
+      socket.leave(room);
+      socket.emit('watch:left', { matchId });
+    });
 
     const token = socket.handshake.auth?.token;
     // console.log("IsToken: ",token);
