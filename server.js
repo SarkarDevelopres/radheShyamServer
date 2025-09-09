@@ -10,11 +10,23 @@ const connectDB = require('./config/connectDB'); // must return a Promise!
 const authenticateUser = require('./middlewares/authenticateUser');
 const { attachSocket } = require('./socket');
 
+const { Worker } = require('worker_threads');
+
 mongoose.set('bufferCommands', false); // fail fast instead of buffering
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+function startWorker(file) {
+  const worker = new Worker(file);
+  worker.on('message', (msg) => console.log(`[worker]${msg}`));
+  worker.on('error', (err) => console.error(`[worker error]`, err));
+  worker.on('exit', (code) => {
+    if (code !== 0) console.error(`[worker exited] code=${code}`);
+  });
+  return worker;
+}
 
 // Routes
 const authRouter = require('./routes/auth.routes');
@@ -47,6 +59,9 @@ async function main() {
   // 1) Connect to Mongo FIRST
   await connectDB(); // must resolve only when connected
   console.log('[db] connected');
+
+  const path = require('path');
+  startWorker(path.resolve(__dirname, 'workers/worker.js'));
 
   // 2) Only then start HTTP & sockets (which start the game engines)
   const server = http.createServer(app);
