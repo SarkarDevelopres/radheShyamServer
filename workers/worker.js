@@ -77,7 +77,7 @@ function expectedEnd(commenceTimeIsoOrDate, category) {
 async function fetchMatchesFromProvider(sport) {
   if (sport === 'cricket') {
     const scheduledUrl = `https://restapi.entitysport.com/exchange/matches/?status=1&token=${process.env.ENTITY_TOKEN}`;
-    const liveUrl =      `https://restapi.entitysport.com/exchange/matches/?status=3&token=${process.env.ENTITY_TOKEN}`;
+    const liveUrl = `https://restapi.entitysport.com/exchange/matches/?status=3&token=${process.env.ENTITY_TOKEN}`;
     const [data, liveData] = await Promise.all([fetch(scheduledUrl), fetch(liveUrl)]);
     if (!data.ok || !liveData.ok) return [];
 
@@ -234,6 +234,7 @@ async function fetchCompletedCricketIds() {
   return items.map(it => String(it.match_id)).filter(Boolean);
 }
 
+
 // ---- Jobs ----
 async function runFetchAndMaterialize() {
   console.log('[mongo] host/db =', mongoose.connection.host, '/', mongoose.connection.name);
@@ -313,24 +314,59 @@ async function runFetchAndMaterialize() {
 
 async function runSettlement() {
   try {
-    const completedIds = await withTimeout(fetchCompletedCricketIds(), 20_000, 'completed:cricket');
-    if (!completedIds.length) {
+    // 1) Handle cricket (provider-driven)
+    const completedIds = await withTimeout(
+      fetchCompletedCricketIds(),
+      20_000,
+      'completed:cricket'
+    );
+
+    if (completedIds.length) {
+      const filter = {
+        sport: 'cricket',
+        matchId: { $in: completedIds },
+        status: { $ne: 'completed' }
+      };
+      const update = {
+        $set: { status: 'completed', updatedAt: new Date() }
+      };
+
+      const res = await Matchs.updateMany(filter, update);
+      console.log(
+        '[settle] cricket completed → matched:',
+        res.matchedCount ?? res.n,
+        ' modified:',
+        res.modifiedCount ?? res.nModified
+      );
+    } else {
       console.log('[settle] no completed cricket matches from provider');
-      return;
     }
 
-    const filter = {
-      sport: 'cricket',
-      matchId: { $in: completedIds },
-      status: { $ne: 'completed' }
-    };
-    const update = { $set: { status: 'completed', updatedAt: new Date() } };
-    const res = await Matchs.updateMany(filter, update);
-    console.log('[settle] cricket completed → matched:', res.matchedCount ?? res.n, ' modified:', res.modifiedCount ?? res.nModified);
+    // 2) Handle all other sports (time-driven)
+    const now = Date.now();
+    const otherRes = await Matchs.updateMany(
+      {
+        sport: { $ne: 'cricket' },            // exclude cricket
+        status: { $in: ['live', 'scheduled'] }, // only if ongoing
+        end_time: { $lt: now }                // expired
+      },
+      {
+        $set: { status: 'completed', updatedAt: new Date() }
+      }
+    );
+
+    console.log(
+      '[settle] non-cricket expired → matched:',
+      otherRes.matchedCount ?? otherRes.n,
+      ' modified:',
+      otherRes.modifiedCount ?? otherRes.nModified
+    );
+
   } catch (e) {
     console.error('[settle] error:', e.message);
   }
 }
+
 
 // ---- Boot once, schedule jobs ----
 (async () => {
@@ -347,7 +383,7 @@ async function runSettlement() {
     // schedule periodic jobs (add small jitter to avoid exact-minute stampedes)
     const jitter = () => 500 + Math.floor(Math.random() * 1500);
     setInterval(runFetchAndMaterialize, 10 * MIN + jitter());
-    setInterval(runSettlement, 30 * 1000 + jitter());
+    setInterval(runSettlement, 2 * 1000 + jitter());
   } catch (err) {
     console.error('[db] connection failed:', err.message);
     process.exit(1);
