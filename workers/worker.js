@@ -159,6 +159,8 @@ async function fetchMatchesFromProvider(sport) {
 
 async function fetchOddsBatch(sport, matchIds, nameById) {
   if (sport === 'cricket') {
+    // console.log(matchIds);
+    
     const url = `https://restapi.entitysport.com/exchange/matchesmultiodds?token=${process.env.ENTITY_TOKEN}&match_id=${matchIds.join(',')}`;
     const res = await fetch(url);
     if (!res.ok) return [];
@@ -170,6 +172,9 @@ async function fetchOddsBatch(sport, matchIds, nameById) {
 
     for (const mid of matchIds) {
       const r = response[mid];
+      // if (mid=='91903') {
+      //   console.log(r);        
+      // }
       const mo = r?.live_odds?.matchodds;
       if (!mo) continue;
 
@@ -288,6 +293,10 @@ async function runFetchAndMaterialize() {
               const match = matches.find(m => m.matchId === d.matchId);
 
               let finalOdds = d.sessionOdds;
+              if (d.matchId == '91903') {
+                console.log(finalOdds);
+                
+              }
 
               // If suspended or live+session odds → empty array
               if (match?.status === 'live') {
@@ -298,7 +307,7 @@ async function runFetchAndMaterialize() {
                 updateOne: {
                   filter: { matchId: d.matchId, bookmakerKey: d.bookmakerKey, marketKey: d.marketKey, sport: d.sport },
                   update: {
-                    $set: { odds: d.odds, sessionOdds:finalOdds, updatedAt: new Date() },
+                    $set: { odds: d.odds, sessionOdd:finalOdds, updatedAt: new Date() },
                     $setOnInsert: { createdAt: new Date(), matchId: d.matchId, bookmakerKey: d.bookmakerKey, marketKey: d.marketKey, sport: d.sport }
                   },
                   upsert: true

@@ -140,9 +140,9 @@ function connectEntity(onUpdate) {
         let teamBName = msg.response.match_info.teamb.name;
         let teamBatting = msg.response.live.team_batting;
         let teamBowling = msg.response.live.team_bowling;
-        let batsmenList = msg.response.live.batsmen
-        let bowlersList = msg.response.live.bowlers
-        let sessionOdds = msg.response.session_odds
+        let batsmenList = msg.response.live.batsmen || [];
+        let bowlersList = msg.response.live.bowlers || [];
+        let sessionOdds = msg.response.session_odds || [];
 
         let data = {
           liveOdds,
@@ -156,7 +156,7 @@ function connectEntity(onUpdate) {
 
         setMatch(matchId, {data:data})
 
-        console.log(msg.response.live);
+        // console.log(msg.response);
         onUpdate(matchId, { kind: 'snapshot', data: data });
         
         if (msg.response.match_info.status_note == 'Match completed') {

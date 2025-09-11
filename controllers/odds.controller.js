@@ -140,7 +140,7 @@ exports.matchOdds = async (req, res) => {
 
     const fetchData = await Odds.findOne({ matchId: matchId }).select('matchId odds marketKey bookmakerKey sport streamLink provider sessionOdd');
 
-    console.log(fetchData);
+    // console.log(fetchData);
 
 
     // console.log("Sports_Key: ", fetchData.sportsKey);
