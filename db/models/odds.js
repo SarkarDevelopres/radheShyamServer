@@ -10,6 +10,7 @@ const OddsSchema = new mongoose.Schema({
     name: String,
     price: Number
   }],
+  sessionOdd: { type: Array },
   isBet: { type: Boolean, default: false },
   provider: { type: String, default: 'the-odds-api' },
   sportsKey: { type: String },

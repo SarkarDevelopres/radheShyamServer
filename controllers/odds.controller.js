@@ -7,25 +7,30 @@ const Matchs = require('../db/models/match');
 const handleSport = async (req, res, sport) => {
   try {
     const [matchs, odds] = await Promise.all([
-      Matchs.find({ sport, status:{$ne:"completed"} }).lean(),
+      Matchs.find({ sport, status: { $ne: "completed" } }).lean(),
       Odds.find({ sport }).lean(),
     ]);
 
     // Build odds lookup: matchId -> odds array
     const oddsMap = new Map();
     for (const o of odds) {
-      oddsMap.set(String(o.matchId), o.odds); // o.odds should already be an array
+      oddsMap.set(String(o.matchId), { odds: o.odds }); // o.odds should already be an array
     }
 
-    const view = matchs.map(m => ({
-      teamHome: m.teamHome,
-      teamAway: m.teamAway,
-      title: m.title,
-      start_time: m.start_time_ist,
-      status: m.status,
-      matchId: m.matchId,
-      odds: oddsMap.get(String(m.matchId)) || [], // always return array
-    }));
+    const view = matchs.map(m => {
+      const o = oddsMap.get(String(m.matchId));
+      // console.log(o.sessionOdds);
+      
+      return {
+        teamHome: m.teamHome,
+        teamAway: m.teamAway,
+        title: m.title,
+        start_time: m.start_time_ist,
+        status: m.status,
+        matchId: m.matchId,
+        odds: o.odds // always return array}
+      }
+    });
 
     return res.json({ success: true, data: view });
   } catch (err) {
@@ -129,11 +134,11 @@ exports.otherLive = async (req, res) => {
 exports.matchOdds = async (req, res) => {
   try {
     const { matchId } = req.body;
-    console.log("MatchID: ", matchId);
+    // console.log("MatchID: ", matchId);
 
     if (!matchId) return res.status(400).json({ success: false, error: 'matchId required' });
 
-    const fetchData = await Odds.findOne({ matchId: matchId }).select('matchId odds marketKey bookmakerKey sport streamLink provider');
+    const fetchData = await Odds.findOne({ matchId: matchId }).select('matchId odds marketKey bookmakerKey sport streamLink provider sessionOdd');
 
     console.log(fetchData);
 
@@ -161,7 +166,8 @@ exports.matchOdds = async (req, res) => {
     data = {
       bookmaker: fetchData.bookmakerKey,
       outcomes: fetchData.odds,
-      market: fetchData.marketKey
+      market: fetchData.marketKey,
+      sessionOdds: fetchData.sessionOdd
     }
 
     // console.log("Session Odds: ", raw.bookmakers[0].markets[0]);

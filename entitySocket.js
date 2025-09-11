@@ -1,6 +1,8 @@
 // entitySocket.js
 require('dotenv').config();
 const WebSocket = require('ws');
+const { setMatch, getMatch, deleteMatch } = require('./cache');
+const { add, remove, isWatched } = require('./isWatched');
 
 const DEBUG = process.env.DEBUG_ENTITY === '1'; // set DEBUG_ENTITY=1 to see verbose logs
 
@@ -131,17 +133,38 @@ function connectEntity(onUpdate) {
       // Log like your entityLogger
       if (msg.api_type === 'match_push_obj') {
         // console.log('[Entity ▶ SNAPSHOT]', summarize(msg));
-        const snapshot = normalizeSnapshot(msg);
+        // const snapshot = normalizeSnapshot(msg);
         let liveScore = msg.response.live.live_score;
         let liveOdds = msg.response.live_odds;
         let teamAName = msg.response.match_info.teama.name;
         let teamBName = msg.response.match_info.teamb.name;
         let teamBatting = msg.response.live.team_batting;
         let teamBowling = msg.response.live.team_bowling;
-        // console.log(msg.response.match_info.teama.name);
-        onUpdate(matchId, { kind: 'snapshot', data: {liveOdds,liveScore,teamData:{teama:teamAName,teamb:teamBName},batBowl:{batting:teamBatting, bowling:teamBowling}} });
+        let batsmenList = msg.response.live.batsmen
+        let bowlersList = msg.response.live.bowlers
+        let sessionOdds = msg.response.session_odds
+
+        let data = {
+          liveOdds,
+          liveScore,
+          batsmenList,
+          bowlersList,
+          sessionOdds,
+          teamData: { teama: teamAName, teamb: teamBName },
+          batBowl: { batting: teamBatting, bowling: teamBowling }
+        }
+
+        setMatch(matchId, {data:data})
+
+        console.log(msg.response.live);
+        onUpdate(matchId, { kind: 'snapshot', data: data });
+        
+        if (msg.response.match_info.status_note == 'Match completed') {
+          deleteMatch(matchId);
+          remove(matchId);
+        }
+
       } else if (msg?.response?.ball_event || msg?.response?.data?.over) {
-        console.log(msg);
         // console.log('[Entity ▶ BALL]', summarize(msg));
         onUpdate(matchId, { kind: 'ball', data: msg.response });
       } else if (DEBUG) {

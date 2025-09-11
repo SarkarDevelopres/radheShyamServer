@@ -6,6 +6,8 @@ const { initHighLow } = require("./games/highlow");
 const { initAAA } = require("./games/aaa");
 const { initDragonTiger } = require("./games/dragontiger");
 const jwt = require('jsonwebtoken');
+const {add,remove} = require('./isWatched');
+const { getMatch } = require('./cache');
 
 let ioInstance = null;
 function canonGameName(g) {
@@ -53,15 +55,21 @@ function attachSocket(server) {
     
     socket.on('watch:join', (matchId) => {
       if (!matchId) return;
+      add(matchId)
+      console.log("Socket Match ID:", matchId);
+      
       const room = `live:match:${matchId}`;
       socket.join(room);
-      socket.emit('watch:joined', { matchId });
+      let data = getMatch(matchId)      
+      socket.emit('watch:joined', { data });
     });
 
     socket.on('watch:leave', (matchId) => {
       if (!matchId) return;
+      remove(matchId)
       const room = `live:match:${matchId}`;
       socket.leave(room);
+      
       socket.emit('watch:left', { matchId });
     });
 

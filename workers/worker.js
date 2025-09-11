@@ -189,7 +189,8 @@ async function fetchOddsBatch(sport, matchIds, nameById) {
         odds: [
           { name: names.teama || 'Team A', price: priceA },
           { name: names.teamb || 'Team B', price: priceB }
-        ]
+        ],
+        sessionOdds : r.session_odds
       });
     }
     return oddsList;
@@ -215,9 +216,9 @@ async function fetchOddsBatch(sport, matchIds, nameById) {
         bookmakerKey: bk.key,
         marketKey: mkt.key,           // e.g., 'h2h' or 'h2h_lay'
         isBet: false,
-        sessionOdds: false,
+        sessionOdds: [],
         provider: 'the-odds-api',
-        odds: mkt                      // store just this market
+        odds: o.bookmakers[0].markets[0].outcomes
       });
     }
   }
@@ -280,18 +281,30 @@ async function runFetchAndMaterialize() {
         const oddDocs = await withTimeout(fetchOddsBatch(sport, ids, globalNameById), 25_000, `odds:${sport}`);
 
         if (oddDocs.length) {
+
           const ops = oddDocs
             .filter(d => d.matchId && d.bookmakerKey && d.marketKey)
-            .map(d => ({
-              updateOne: {
-                filter: { matchId: d.matchId, bookmakerKey: d.bookmakerKey, marketKey: d.marketKey, sport: d.sport },
-                update: {
-                  $set: { odds: d.odds, updatedAt: new Date() },
-                  $setOnInsert: { createdAt: new Date(), matchId: d.matchId, bookmakerKey: d.bookmakerKey, marketKey: d.marketKey, sport: d.sport }
-                },
-                upsert: true
+            .map(d => {
+              const match = matches.find(m => m.matchId === d.matchId);
+
+              let finalOdds = d.sessionOdds;
+
+              // If suspended or live+session odds → empty array
+              if (match?.status === 'live') {
+                finalOdds = [];
               }
-            }));
+              return {
+
+                updateOne: {
+                  filter: { matchId: d.matchId, bookmakerKey: d.bookmakerKey, marketKey: d.marketKey, sport: d.sport },
+                  update: {
+                    $set: { odds: d.odds, sessionOdds:finalOdds, updatedAt: new Date() },
+                    $setOnInsert: { createdAt: new Date(), matchId: d.matchId, bookmakerKey: d.bookmakerKey, marketKey: d.marketKey, sport: d.sport }
+                  },
+                  upsert: true
+                }
+              }
+            });
           if (ops.length) {
             const res = await Odds.bulkWrite(ops, { ordered: false });
             console.log('[odds.bulkWrite] matched=', res.matchedCount, ' modified=', res.modifiedCount, ' upserted=', res.upsertedCount);
@@ -383,7 +396,7 @@ async function runSettlement() {
     // schedule periodic jobs (add small jitter to avoid exact-minute stampedes)
     const jitter = () => 500 + Math.floor(Math.random() * 1500);
     setInterval(runFetchAndMaterialize, 10 * MIN + jitter());
-    setInterval(runSettlement, 2 * 1000 + jitter());
+    setInterval(runSettlement, 30 * 1000 + jitter());
   } catch (err) {
     console.error('[db] connection failed:', err.message);
     process.exit(1);
