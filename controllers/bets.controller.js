@@ -12,7 +12,7 @@ exports.placeBets = async (req, res) => {
   // body: { matchId, selection, stake, odds, bookmakerKey }
 
   try {
-    const { token, matchId, market, bookmakerKey, selection, stake, odds } = req.body;
+    const { token, matchId, market, bookmakerKey, selection, stake, odds, lay, deductAmount } = req.body;
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.userID;
     console.log(req.body);
@@ -25,7 +25,7 @@ exports.placeBets = async (req, res) => {
     if (!Number.isInteger(stake) || stake <= 0) return res.status(400).json({ error: 'Invalid stake' });
     if (odds <= 1) return res.status(400).json({ error: 'Invalid odds' });
 
-    let betPlacedData = await placeSportsBetTx({ userId, eventId: matchId, market, selection, stake, odds });
+    let betPlacedData = await placeSportsBetTx({ userId, eventId: matchId, market, selection, stake, odds, lay, deductAmount });
     console.log(betPlacedData);
 
     if (betPlacedData.ok) {
@@ -71,9 +71,9 @@ exports.takeBet = async (req, res) => {
     if (betDetails) {
       let odds = betDetails.odds;
       let stake = betDetails.stake;
-      console.log("Odds: ",odds);      
-      let balanceAdd = Math.round(stake - (2*odds));
-      console.log("Added balance: ",balanceAdd);      
+      console.log("Odds: ", odds);
+      let balanceAdd = Math.round(stake - (2 * odds));
+      console.log("Added balance: ", balanceAdd);
       await betDetails.deleteOne();
       let user = await User.findByIdAndUpdate(userId, { $inc: { balance: balanceAdd } }, { new: true });
       const io = getIO();
@@ -95,4 +95,18 @@ exports.takeBet = async (req, res) => {
     res.status(300).json({ ok: false, message: "Cashed Out Failed" });
   }
 
+}
+
+exports.findBets = async (req, res) => {
+  try {
+    const { matchId, userToken } = req.body;
+    const decoded = jwt.verify(userToken, process.env.JWT_SECRET);
+    const userId = decoded.userID;
+
+    let matchBets = await Bet.find({userId:userId, eventId:matchId})
+    res.status(200).json({ok:true, data:matchBets});
+
+  } catch (error) {
+    res.status(500).json({ok:false, message:error.message})
+  }
 }

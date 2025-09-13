@@ -1,6 +1,7 @@
 // db/store.js
 const User = require('./models/user');
 const Bet = require('./models/bet');
+const Odds = require('../db/models/odds');
 const Round = require('./models/round');
 const Transaction = require('./models/transaction'); // optional but recommended
 const mongoose = require('mongoose');
@@ -89,7 +90,7 @@ async function lockBetsForRound(roundId) {
 async function fetchBalance(userId) {
   // console.log("USERID: ", userId);
   console.log(userId);
-  
+
   const u = await User.findById(userId).select("balance");
   return u;
 }
@@ -102,7 +103,7 @@ async function placeBetTx({ userId, game, tableId, roundId, market, stake }) {
     if (!r || r.status !== 'OPEN' || Date.now() >= toMs(r.betsCloseAt)) {
       throw new Error('BETS_LOCKED');
     }
-    
+
     const u = await User.findOneAndUpdate(
       { _id: userId, balance: { $gte: stake } },
       { $inc: { balance: -stake } },
@@ -151,23 +152,21 @@ async function placeBetTx({ userId, game, tableId, roundId, market, stake }) {
 }
 
 // ---------- sports bet placement (HTTP route) ----------
-async function placeSportsBetTx({ userId, eventId, market,selection, stake, odds }) {
-  console.log("USerID: u",userId);
-  
+async function placeSportsBetTx({ userId, eventId, market, selection, stake, odds, lay, deductAmount }) {
+  // console.log("USerID: u", userId);
+
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
     const u = await User.findOneAndUpdate(
-      { _id: userId, balance: { $gte: stake } },
-      { $inc: { balance: -stake } },
+      { _id: userId, balance: { $gte: deductAmount } },
+      { $inc: { balance: -deductAmount } },
       { new: true, session }
     );
-    console.log("User Is: ",u);
-    
     if (!u) throw new Error('INSUFFICIENT_FUNDS');
 
     const potentialPayout = odds ? Math.floor(stake * odds) : undefined;
-
+   
     const [betDoc] = await Bet.create(
       [{
         userId,
@@ -179,8 +178,15 @@ async function placeSportsBetTx({ userId, eventId, market,selection, stake, odds
         odds,
         status: 'OPEN',
         potentialPayout,
+        lay:lay
       }],
       { session }
+    );
+
+    const setBetTrue = await Odds.findOneAndUpdate(
+      { matchId: eventId, isBet: false },   // condition
+      { $set: { isBet: true } },            // update
+      { new: true }                         // return updated doc
     );
 
     try {
@@ -198,7 +204,7 @@ async function placeSportsBetTx({ userId, eventId, market,selection, stake, odds
 
     await session.commitTransaction();
     session.endSession();
-    return { ok: true, _doc:{balance: u.balance} };
+    return { ok: true, _doc: { balance: u.balance } };
   } catch (e) {
     await session.abortTransaction().catch(() => { });
     session.endSession();
@@ -238,14 +244,14 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
     let pushes = 0;
 
     if (canonGame === 'SEVEN_UP_DOWN') {
-      
+
       // console.log("I TOO WAS CALLED");
       for (const b of bets) {
         const pick = normalize(b.market);
         const won = pick === canonFirstOutcome || pick === canonGroupOutcome || pick == canonSuitOutcome;
         const odd = won ? (SevenODDS[pick] || 0) : 0;
         const payout = won ? Math.round(Number(b.stake) * Number(odd)) : 0;
-      
+
 
         betUpdates.push({
           updateOne: {
@@ -287,8 +293,8 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
         }
       }
     } else if (canonGame === 'HIGH_LOW') {
-      
-      
+
+
       const tiePush = meta.tiePush !== false;
       const marketWins = canonOutcome === 'HIGH' ? 'high' : canonOutcome === 'LOW' ? 'low' : null;
       const roundOdds = odds
@@ -470,7 +476,7 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
     // If (and only if) your UI insists on 'WON'/'LOST' for round.status, switch to:
     // round.status = 'CLOSED';
     // console.log(winners);
-    
+
     round.outcome = canonOutcome;
     round.summary = {
       winners,
