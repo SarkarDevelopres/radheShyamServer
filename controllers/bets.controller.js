@@ -3,7 +3,8 @@ const Bet = require('../db/models/bet');
 const Transaction = require('../db/models/transaction');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
-const { placeSportsBetTx, fetchBalance } = require('../db/store')
+const { placeSportsBetTx, fetchBalance } = require('../db/store');
+const { cashoutPortfolio } = require('../cashout')
 dotenv.config();
 const { getIO } = require('../socket');
 
@@ -61,41 +62,61 @@ exports.placeBets = async (req, res) => {
 }
 
 exports.takeBet = async (req, res) => {
-  console.log("called ?");
-
   try {
-    const { token, matchId } = req.body;
+    const { token, matchId, oddsBook } = req.body;
+    // oddsBook should be sent from frontend: { "Team A": { back:2.0, lay:2.02 }, ... }
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.userID;
-    let betDetails = await Bet.findOne({ eventId: matchId, userId: userId });
-    if (betDetails) {
-      let odds = betDetails.odds;
-      let stake = betDetails.stake;
-      console.log("Odds: ", odds);
-      let balanceAdd = Math.round(stake - (2 * odds));
-      console.log("Added balance: ", balanceAdd);
-      await betDetails.deleteOne();
-      let user = await User.findByIdAndUpdate(userId, { $inc: { balance: balanceAdd } }, { new: true });
-      const io = getIO();
-      const sockets = await io.fetchSockets();
 
-      for (const sock of sockets) {
-        if (!sock.userID) continue;  // skip game sockets
+    // 1. Find all OPEN bets for this user + match
+    const bets = await Bet.find({ eventId: matchId, userId, status: "OPEN" });
+    if (!bets.length) {
+      return res.status(404).json({ ok: false, message: "No open bets found" });
+    }
 
+    // 2. Run cashout calculation
+    const result = cashoutPortfolio(bets, oddsBook);
+
+    if (result.unavailable) {
+      return res.status(400).json({ ok: false, message: "Cashout unavailable" });
+    }
+
+    // 3. Update user balance with payoutNow
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $inc: { balance: result.payoutNow } },
+      { new: true }
+    );
+
+    // 4. Mark bets as cashed out
+    await Bet.updateMany(
+      { eventId: matchId, userId, status: "OPEN" },
+      { $set: { status: "SETTLED" } }
+    );
+
+    // 5. Emit wallet update to socket clients
+    const io = getIO();
+    const sockets = await io.fetchSockets();
+    for (const sock of sockets) {
+      if (!sock.userID) continue;
+      if (sock.userID.toString() === userId.toString()) {
         sock.emit("wallet:update", { ok: true, _doc: { balance: user.balance } });
       }
-      console.log("balance taken: ", user);
-      res.status(200).json({ ok: true, message: "Bet Cashed Out" });
     }
-    else {
-      res.status(300).json({ ok: false, message: "Bet Don't Exists" });
-    }
+
+    res.status(200).json({
+      ok: true,
+      message: "Cashout successful",
+      result,
+      balance: user.balance,
+    });
 
   } catch (error) {
-    res.status(300).json({ ok: false, message: "Cashed Out Failed" });
+    console.error("Cashout error:", error);
+    res.status(500).json({ ok: false, message: "Cashout failed" });
   }
-
-}
+};
 
 exports.findBets = async (req, res) => {
   try {
@@ -103,10 +124,10 @@ exports.findBets = async (req, res) => {
     const decoded = jwt.verify(userToken, process.env.JWT_SECRET);
     const userId = decoded.userID;
 
-    let matchBets = await Bet.find({userId:userId, eventId:matchId})
-    res.status(200).json({ok:true, data:matchBets});
+    let matchBets = await Bet.find({ userId: userId, eventId: matchId, status:"OPEN" })
+    res.status(200).json({ ok: true, data: matchBets });
 
   } catch (error) {
-    res.status(500).json({ok:false, message:error.message})
+    res.status(500).json({ ok: false, message: error.message })
   }
 }
