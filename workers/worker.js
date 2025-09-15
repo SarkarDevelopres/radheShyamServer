@@ -98,8 +98,8 @@ async function fetchMatchesFromProvider(sport) {
         matchId: String(it.match_id),
         sport: 'cricket',
         sportKey: 'cricket',
-        teamHome: it.teama?.name,
-        teamAway: it.teamb?.name,
+        teamHome: it.teama,
+        teamAway: it.teamb,
         title: it.competition?.title,
         start_time: startTime ? startTime.getTime() : null,
         end_time: endTime ? endTime.getTime() : null,
@@ -272,8 +272,8 @@ async function runFetchAndMaterialize() {
       // merge into global map
       for (const m of matches) {
         globalNameById.set(String(m.matchId), {
-          teama: m.teamHome,
-          teamb: m.teamAway,
+          teama: m.teamHome.name,
+          teamb: m.teamAway.name,
           bookmakerKey: m.bookmakerKey || (sport === 'cricket' ? 'entity' : undefined)
         });
       }

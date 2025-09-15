@@ -157,6 +157,8 @@ function connectEntity(onUpdate) {
         }
 
         setMatch(matchId, {data:data})
+        // console.log(msg);
+        
 
         onUpdate(matchId, { kind: 'snapshot', data: data });
         

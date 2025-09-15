@@ -140,29 +140,6 @@ exports.matchOdds = async (req, res) => {
 
     const fetchData = await Odds.findOne({ matchId: matchId }).select('matchId odds marketKey bookmakerKey sport streamLink provider sessionOdd');
 
-    // console.log(fetchData);
-
-
-    // console.log("Sports_Key: ", fetchData.sportsKey);
-    // const url = `https://api.the-odds-api.com/v4/sports/${fetchData.sportsKey}/events/${matchId}/odds?apiKey=${process.env.ODDS_API_KEY}&regions=uk&markets=h2h,player_assists,player_field_goals`;
-
-    // const apiRes = await fetch(url);
-    // if (!apiRes.ok) {
-    //   let tempData = {
-    //     bookmaker: fetchData.bookmakerKey,
-    //     outcomes: fetchData.odds,
-    //     market: fetchData.marketKey
-    //   }
-    //   return res.status(apiRes.status).json({ success: true, data: tempData, message: `Upstream ${apiRes.status}` });
-    // }
-
-    // const raw = await apiRes.json();
-    // let bookmakers = [];
-
-    // bookmaker: raw.bookmakers[0].key,
-    // outcomes: raw.bookmakers[0].markets[0].outcomes,
-    // market: raw.bookmakers[0].markets[0].key
-
     data = {
       bookmaker: fetchData.bookmakerKey,
       outcomes: fetchData.odds,

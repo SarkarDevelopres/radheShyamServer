@@ -2,8 +2,8 @@
 const mongoose = require('mongoose');
 const MatchScehma = new mongoose.Schema({
     matchId:  { type: String, required: true },
-    teamHome: { type: String, required: true },
-    teamAway: { type: String, required: true },
+    teamHome: { type: Object, required: true },
+    teamAway: { type: Object, required: true },
     title: { type: String },
     category: { type: String },
     start_time: { type: Number },

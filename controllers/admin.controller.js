@@ -3,6 +3,7 @@ dotenv.config();
 const jwt = require('jsonwebtoken');
 const Round = require('../db/models/round');
 const User = require('../db/models/user');
+const Employee = require('../db/models/employee');
 const Admin = require('../db/models/admin');
 const Odds = require('../db/models/odds');
 const Transaction = require('../db/models/transaction');
@@ -185,6 +186,45 @@ exports.totalUsersDetails = async (req, res) => {
         });
     } catch (error) {
         console.error("Error in gameLog:", error);
+        return res.status(500).json({
+            ok: false,
+            message: "Server error",
+        });
+    }
+}
+exports.totalEmployeeDetails = async (req, res) => {
+    // console.log("I am triggered!");
+
+    try {
+        // Read token from Authorization header
+        const authHeader = req.headers['authorization'];
+        if (!authHeader) {
+            return res.status(401).json({ ok: false, message: "No token provided" });
+        }
+
+        // Format: "Bearer <token>"
+        const token = authHeader.split(" ")[1];
+        if (!token) {
+            return res.status(401).json({ ok: false, message: "Invalid token format" });
+        }
+
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const adminId = decoded.adminID;
+
+        if (!adminId) {
+            return res.status(401).json({ ok: false, message: "Unauthorized" });
+        }
+
+        // Fetch latest 5 rounds
+        const totalEmployee = await Employee.find().select('_id email phone employee_id name');
+
+        return res.status(200).json({
+            ok: true,
+            totalEmployee: totalEmployee,
+        });
+    } catch (error) {
+        console.error("Error in employee data:", error);
         return res.status(500).json({
             ok: false,
             message: "Server error",
@@ -485,6 +525,52 @@ exports.deleteUser = async (req, res) => {
         return res.status(500).json({ ok: false, message: "Server error" });
     }
 }
+exports.deleteEmp = async (req, res) => {
+
+    try {
+        const authHeader = req.headers["authorization"];
+        if (!authHeader) {
+            return res.status(401).json({ ok: false, message: "No token provided" });
+        }
+
+        // Format: "Bearer <token>"
+        const token = authHeader.split(" ")[1];
+        if (!token) {
+            return res.status(401).json({ ok: false, message: "Invalid token format" });
+        }
+
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const adminId = decoded.adminID;
+
+        if (!adminId) {
+            return res.status(401).json({ ok: false, message: "Unauthorized" });
+        }
+
+        const { empId } = req.body;
+
+        if (!empId) {
+            return res.status(400).json({ ok: false, message: "userId required" });
+        }
+
+        // First check if user exists and has enough balance
+        const emp = await Employee.findById(empId);
+        if (!emp) {
+            return res.status(404).json({ ok: false, message: "Employee not found" });
+        }
+
+        await Employee.findByIdAndDelete(empId);
+
+        return res.status(200).json({
+            ok: true,
+            message: `Employee deleted successfully`
+        });
+
+    } catch (error) {
+        console.error("User Delete Error:", error);
+        return res.status(500).json({ ok: false, message: "Server error" });
+    }
+}
 
 exports.findUser = async (req, res) => {
     try {
@@ -617,7 +703,7 @@ exports.getLiveOdds = async (req, res) => {
 exports.updateOddsStream = async (req, res) => {
     try {
         console.log("I was called!! ");
-        
+
         const authHeader = req.headers["authorization"];
         if (!authHeader) {
             return res.status(401).json({ ok: false, message: "No token provided" });
@@ -677,3 +763,70 @@ exports.updateOddsStream = async (req, res) => {
         return res.status(500).json({ ok: false, message: "Server error" });
     }
 }
+
+
+exports.createEmp = async (req, res) => {
+    try {
+        const authHeader = req.headers["authorization"];
+        if (!authHeader) {
+            return res.status(401).json({ ok: false, message: "No token provided" });
+        }
+
+        // Format: "Bearer <token>"
+        const token = authHeader.split(" ")[1];
+        if (!token) {
+            return res.status(401).json({ ok: false, message: "Invalid token format" });
+        }
+
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const adminId = decoded.adminID;
+
+        if (!adminId) {
+            return res.status(401).json({ ok: false, message: "Unauthorized" });
+        }
+
+        const { name, email, phone, password } = req.body;
+
+        console.log(req.body);
+        
+        // console.log("USername: ", name);
+
+
+        if (!name || !phone || !password || !email) {
+            return res.status(400).json({ ok: false, message: "All fields are required" });
+        }
+
+        // Check if user exists
+        const existingEmp = await Employee.findOne({ $or: [{ email }, { phone },] });
+        if (existingEmp) {
+            return res.status(409).json({ ok: false, message: "User already exists" });
+        }
+
+        let randomId = String(Math.floor(Math.random() * 100000)).padStart(5, '0');
+        let employeeID = `emp${randomId}`;
+
+        const newEmp = new Employee({
+            name,
+            phone,
+            email,
+            password: password,
+            employee_id: employeeID
+        });
+
+        await newEmp.save();
+
+        return res.status(201).json({
+            ok: true,
+            message: "User created successfully",
+            empData: {
+                _id: newEmp._id,
+                name: newEmp.name,
+                phone: newEmp.phone,
+            },
+        });
+    } catch (error) {
+        console.error("Create employee error:", error);
+        return res.status(500).json({ ok: false, message: "Server error" });
+    }
+};

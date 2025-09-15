@@ -2,6 +2,7 @@
 const User = require('../db/models/user');
 const jwt = require('jsonwebtoken');
 const Admin = require('../db/models/admin');
+const Employee = require('../db/models/employee');
 const dotenv = require('dotenv');
 dotenv.config();
 
@@ -104,3 +105,51 @@ exports.adminSignUp = async (req, res) => {
     }
 }
 
+exports.empLogin = async (req, res) => {
+    try {
+        const { empId, password } = req.body;
+
+        console.log(empId, password);
+        
+
+        let exisitingEmployee = await Employee.findOne({ "employee_id": empId }).select('password');
+
+        console.log(exisitingEmployee);
+
+        if (!exisitingEmployee) {
+            return res.status(400).json({ message: 'Invalid Credentials', success: false });
+        }
+
+        if (exisitingEmployee.password != password) {
+            return res.status(400).json({ message: 'Invalid Credentials', success: false });
+        }
+        const token = jwt.sign(
+            { employeeID: exisitingEmployee._id }, // payload
+            process.env.JWT_SECRET,        // secret key
+            { expiresIn: '1d' }            // expiry
+        );
+
+        console.log(req.body);
+        res.status(201).json({ message: 'Employee logged In', success: true, token , empId:empId });
+
+    } catch (error) {
+
+    }
+}
+
+exports.empCreate = async (req, res) => {
+    try {
+        const { empId, email, password, phone, role="general" } = req.body;
+        const newAdmin = new Employee({
+            employee_id:empId,
+            email,
+            phone,
+            password,
+            role
+        })
+        await newAdmin.save();
+        return res.status(200).json({ message: 'Employee Created !', success: true });
+    } catch (error) {
+        return res.status(400).json({ message: error.message, success: false });
+    }
+}
