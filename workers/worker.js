@@ -106,7 +106,8 @@ async function fetchMatchesFromProvider(sport) {
         category: it.format_str,
         start_time_ist: startTime ? displayTimeIST(startTime) : '',
         end_time_ist: endTime ? displayTimeIST(endTime) : '',
-        status: String(it.status_str || '').toLowerCase(), // scheduled/live/completed
+        status: String(it.status_str || '').toLowerCase(),
+        game_state:{code:it.game_state, string:it.game_state_str},
         isOdds: true,
         sessionOdds: !!it.session_odds_available
       });
@@ -243,7 +244,7 @@ async function fetchCompletedCricketIds() {
 
 // ---- Jobs ----
 async function runFetchAndMaterialize() {
-  console.log('[mongo] host/db =', mongoose.connection.host, '/', mongoose.connection.name);
+  // console.log('[mongo] host/db =', mongoose.connection.host, '/', mongoose.connection.name);
   const started = Date.now();
   let totalMatches = 0, totalOdds = 0;
 
@@ -252,7 +253,7 @@ async function runFetchAndMaterialize() {
 
   for (const sport of SPORTS) {
     try {
-      console.log(`[worker] → ${sport}: fetching fixtures`);
+      // console.log(`[worker] → ${sport}: fetching fixtures`);
       const matches = await withTimeout(fetchMatchesFromProvider(sport), 25_000, `fixtures:${sport}`);
 
       // upsert matches
@@ -265,7 +266,7 @@ async function runFetchAndMaterialize() {
           }
         }));
         const r = await Matchs.bulkWrite(matchOps, { ordered: false });
-        console.log('[matches.bulkWrite] matched=', r.matchedCount, ' modified=', r.modifiedCount, ' upserted=', r.upsertedCount);
+        // console.log('[matches.bulkWrite] matched=', r.matchedCount, ' modified=', r.modifiedCount, ' upserted=', r.upsertedCount);
       }
       totalMatches += matches.length;
 
@@ -282,7 +283,7 @@ async function runFetchAndMaterialize() {
       const ids = active.map(a => a.matchId);
 
       if (ids.length) {
-        console.log(`[worker] → ${sport}: fetching odds for ${ids.length}`);
+        // console.log(`[worker] → ${sport}: fetching odds for ${ids.length}`);
         const oddDocs = await withTimeout(fetchOddsBatch(sport, ids, globalNameById), 25_000, `odds:${sport}`);
 
         if (oddDocs.length) {
@@ -294,7 +295,7 @@ async function runFetchAndMaterialize() {
 
               let finalOdds = d.sessionOdds;
               if (d.matchId == '91903') {
-                console.log(finalOdds);
+                // console.log(finalOdds);
                 
               }
 
@@ -316,7 +317,7 @@ async function runFetchAndMaterialize() {
             });
           if (ops.length) {
             const res = await Odds.bulkWrite(ops, { ordered: false });
-            console.log('[odds.bulkWrite] matched=', res.matchedCount, ' modified=', res.modifiedCount, ' upserted=', res.upsertedCount);
+            // console.log('[odds.bulkWrite] matched=', res.matchedCount, ' modified=', res.modifiedCount, ' upserted=', res.upsertedCount);
           }
           totalOdds += oddDocs.length;
         }
@@ -331,7 +332,7 @@ async function runFetchAndMaterialize() {
   // save merged cache once
   memCache.set('nameById', globalNameById);
 
-  console.log(`[worker] ✓ refresh done in ${Date.now() - started}ms  matches:${totalMatches} odds:${totalOdds}`);
+  // console.log(`[worker] ✓ refresh done in ${Date.now() - started}ms  matches:${totalMatches} odds:${totalOdds}`);
 }
 
 async function runSettlement() {

@@ -17,20 +17,27 @@ const handleSport = async (req, res, sport) => {
       oddsMap.set(String(o.matchId), { odds: o.odds }); // o.odds should already be an array
     }
 
-    const view = matchs.map(m => {
-      const o = oddsMap.get(String(m.matchId));
-      // console.log(o.sessionOdds);
-      
-      return {
-        teamHome: m.teamHome,
-        teamAway: m.teamAway,
-        title: m.title,
-        start_time: m.start_time_ist,
-        status: m.status,
-        matchId: m.matchId,
-        odds: o.odds // always return array}
-      }
-    });
+    const view = matchs
+      .map(m => {
+        const o = oddsMap.get(String(m.matchId));
+        if (!o) return null; // skip if no odds
+        return {
+          teamHome: m.teamHome,
+          teamAway: m.teamAway,
+          title: m.title,
+          start_time: m.start_time_ist,
+          status: m.status,
+          matchId: m.matchId,
+          odds: o.odds
+        };
+      })
+      .filter(Boolean) // remove nulls
+      .sort((a, b) => {
+        // live first
+        if (a.status === "live" && b.status !== "live") return -1;
+        if (a.status !== "live" && b.status === "live") return 1;
+        return 0; // keep relative order otherwise
+      });
 
     return res.json({ success: true, data: view });
   } catch (err) {
@@ -139,6 +146,7 @@ exports.matchOdds = async (req, res) => {
     if (!matchId) return res.status(400).json({ success: false, error: 'matchId required' });
 
     const fetchData = await Odds.findOne({ matchId: matchId }).select('matchId odds marketKey bookmakerKey sport streamLink provider sessionOdd');
+    const matchData = await Matchs.findOne({ matchId: matchId }).select('teamAway teamHome game_state')
 
     data = {
       bookmaker: fetchData.bookmakerKey,
@@ -151,7 +159,7 @@ exports.matchOdds = async (req, res) => {
 
 
 
-    return res.json({ success: true, data: data, meta: { sportkey: fetchData.sport, matchId: fetchData.matchId, market: fetchData.marketKey, streamLink: fetchData.streamLink } });
+    return res.json({ success: true, data: data, meta: { sportkey: fetchData.sport, matchId: fetchData.matchId, market: fetchData.marketKey, streamLink: fetchData.streamLink }, matchData: matchData });
   } catch (error) {
     console.error('[odds] matchOdds error:', error);
     return res.status(500).json({ success: false, error: 'Failed to fetch odds' });

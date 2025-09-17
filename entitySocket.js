@@ -144,6 +144,8 @@ function connectEntity(onUpdate) {
         let bowlersList = msg.response.live.bowlers || [];
         let sessionOdds = msg.response.session_odds || [];
         let liveStatus = msg.response.match_info.live;
+        let gameState = msg.response.match_info.game_state;
+        let gameStateStr = msg.response.match_info.game_state_str;
 
         let data = {
           liveOdds,
@@ -152,12 +154,13 @@ function connectEntity(onUpdate) {
           bowlersList,
           sessionOdds,
           liveStatus,
+          gameState:{code:gameState, string: gameStateStr},
           teamData: { teama: teamAName, teamb: teamBName },
           batBowl: { batting: teamBatting, bowling: teamBowling }
         }
 
         setMatch(matchId, {data:data})
-        // console.log(msg);
+        console.log(msg.response.match_info.title);
         
 
         onUpdate(matchId, { kind: 'snapshot', data: data });
