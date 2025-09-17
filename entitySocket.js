@@ -144,6 +144,7 @@ function connectEntity(onUpdate) {
         let bowlersList = msg.response.live.bowlers || [];
         let sessionOdds = msg.response.session_odds || [];
         let liveStatus = msg.response.match_info.live;
+        let currentStatus = msg.response.match_info.status;
         let gameState = msg.response.match_info.game_state;
         let gameStateStr = msg.response.match_info.game_state_str;
 
@@ -154,24 +155,25 @@ function connectEntity(onUpdate) {
           bowlersList,
           sessionOdds,
           liveStatus,
+          currentStatus,
           gameState:{code:gameState, string: gameStateStr},
           teamData: { teama: teamAName, teamb: teamBName },
           batBowl: { batting: teamBatting, bowling: teamBowling }
         }
 
         setMatch(matchId, {data:data})
-        console.log(msg.response.match_info.title);
+        // console.log(msg.response.match_info);
         
 
         onUpdate(matchId, { kind: 'snapshot', data: data });
         
-        if (msg.response.match_info.status_note == 'Match completed') {
+        
+      } else if (msg?.response?.ball_event || msg?.response?.data?.over) {
+        // console.log('[Entity ▶ BALL]', msg.response.ball_event);
+        if (msg.response.ball_event == 'Match End') {
           deleteMatch(matchId);
           remove(matchId);
         }
-
-      } else if (msg?.response?.ball_event || msg?.response?.data?.over) {
-        // console.log('[Entity ▶ BALL]', summarize(msg));
         onUpdate(matchId, { kind: 'ball', data: msg.response });
       } else if (DEBUG) {
         // console.log('[Entity ▶ MISC]', summarize(msg));
