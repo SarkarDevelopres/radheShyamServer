@@ -11,6 +11,7 @@ const BetSchema = new mongoose.Schema({
   eventId: { type: String, index: true },     // e.g. matchId from odds feed
   market: { type: String },                   // e.g. 'h2h', 'winner', 'OU', etc.
   selection: { type: String },                // team/runner
+  selectionName: { type: String },                // team/runner
   odds: { type: Number },                     // decimal odds, frozen at placement
   bookmakerKey: { type: String },
   lay: { type: Boolean, default: false },

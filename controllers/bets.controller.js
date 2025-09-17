@@ -13,7 +13,7 @@ exports.placeBets = async (req, res) => {
   // body: { matchId, selection, stake, odds, bookmakerKey }
 
   try {
-    const { token, matchId, market, bookmakerKey, selection, stake, odds, lay, deductAmount } = req.body;
+    const { token, matchId, market, bookmakerKey,selectionName, selection, stake, odds, lay, deductAmount } = req.body;
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.userID;
     console.log(req.body);
@@ -26,7 +26,7 @@ exports.placeBets = async (req, res) => {
     if (!Number.isInteger(stake) || stake <= 0) return res.status(400).json({ error: 'Invalid stake' });
     if (odds <= 1) return res.status(400).json({ error: 'Invalid odds' });
 
-    let betPlacedData = await placeSportsBetTx({ userId, eventId: matchId, market, selection, stake, odds, lay, deductAmount });
+    let betPlacedData = await placeSportsBetTx({ userId, eventId: matchId, market, selection,selectionName, stake, odds, lay, deductAmount });
     console.log(betPlacedData);
 
     if (betPlacedData.ok) {
