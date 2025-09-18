@@ -10,7 +10,7 @@ const MatchScehma = new mongoose.Schema({
     end_time: { type: Number },
     start_time_ist: { type: String },
     end_time_ist: { type: String },
-    status: { type: String, enum: ["scheduled", "live", "completed"] },
+    status: { type: String, enum: ["scheduled", "live", "completed", "bets_pending"] },
     game_state: { type: Object },
     isOdds: { type: Boolean },
     sport: { type: String },

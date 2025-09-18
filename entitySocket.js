@@ -3,6 +3,7 @@ require('dotenv').config();
 const WebSocket = require('ws');
 const { setMatch, getMatch, deleteMatch } = require('./cache');
 const { add, remove, isWatched } = require('./isWatched');
+const Matchs = require('./db/models/match');
 
 const DEBUG = process.env.DEBUG_ENTITY === '1'; // set DEBUG_ENTITY=1 to see verbose logs
 
@@ -115,7 +116,7 @@ function connectEntity(onUpdate) {
 
     ws.on('pong', () => { /* heartbeat ok */ });
 
-    ws.on('message', (buf) => {
+    ws.on('message', async (buf) => {
       let msg;
       try {
         msg = JSON.parse(buf.toString());
@@ -156,21 +157,25 @@ function connectEntity(onUpdate) {
           sessionOdds,
           liveStatus,
           currentStatus,
-          gameState:{code:gameState, string: gameStateStr},
+          gameState: { code: gameState, string: gameStateStr },
           teamData: { teama: teamAName, teamb: teamBName },
           batBowl: { batting: teamBatting, bowling: teamBowling }
         }
 
-        setMatch(matchId, {data:data})
-        // console.log(msg.response.match_info);
-        
+        setMatch(matchId, { data: data })
+        console.log(msg.response.live);
+
 
         onUpdate(matchId, { kind: 'snapshot', data: data });
-        
-        
+
+
       } else if (msg?.response?.ball_event || msg?.response?.data?.over) {
         // console.log('[Entity ▶ BALL]', msg.response.ball_event);
         if (msg.response.ball_event == 'Match End') {
+          await Matchs.updateOne(
+            { matchId },
+            { $set: { status: 'bets_pending', updatedAt: new Date() } }
+          );
           deleteMatch(matchId);
           remove(matchId);
         }

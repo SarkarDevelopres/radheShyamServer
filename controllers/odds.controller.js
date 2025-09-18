@@ -7,7 +7,7 @@ const Matchs = require('../db/models/match');
 const handleSport = async (req, res, sport) => {
   try {
     const [matchs, odds] = await Promise.all([
-      Matchs.find({ sport, status: { $ne: "completed" } }).lean(),
+      Matchs.find({ sport, status: { $nin: ["completed", "bets_pending"] } }).lean(),
       Odds.find({ sport }).lean(),
     ]);
 
