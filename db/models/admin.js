@@ -20,17 +20,19 @@ const AdminSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum:['admin', 'sub-admin'],
-        required:true
+        enum: ['admin', 'sub-admin'],
+        required: true
     },
     blocked: { type: Boolean, default: false },
+    maintinaince: { type: Boolean },
+    maintinainceString: { type: String },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 
 AdminSchema.index(
-  { role: 1 }, 
-  { unique: true, partialFilterExpression: { role: 'admin' } }
+    { role: 1 },
+    { unique: true, partialFilterExpression: { role: 'admin' } }
 );
 
 AdminSchema.pre('save', async function (next) {
