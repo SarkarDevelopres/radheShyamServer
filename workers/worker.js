@@ -6,6 +6,7 @@ const Odds = require('../db/models/odds');
 const Bet = require('../db/models/bet');
 const User = require('../db/models/user');
 const Transaction = require('../db/models/transaction');
+// const { getIO } = require("../socket");
 
 // ---- Mongoose setup (single connection) ----
 mongoose.set('bufferCommands', false);
@@ -253,7 +254,18 @@ async function fetchCompletedCricketIds() {
 }
 
 
-
+function testWin(userId) {
+      const io = getIO();
+      io.to(`user:${userId}`).emit("wallet:update", {
+        ok: true,
+        balance: 1234.56,   // fake balance
+        amount: 500,        // fake win amount
+        type: "bet_win",
+        betId: "test123",
+        eventId: "match_test"
+      });
+      console.log(`[test] emitted fake win to user:${userId}`);
+    }
 // ---- Jobs ----
 async function runFetchAndMaterialize() {
   // console.log('[mongo] host/db =', mongoose.connection.host, '/', mongoose.connection.name);
@@ -349,6 +361,8 @@ async function runFetchAndMaterialize() {
 
 async function runSettlement() {
   try {
+    // const io = getIO();
+    // testWin("68ada5984140021fe4bd57a0")
     // 1) Fetch provider’s completed matches (with winners)
     const completed = await withTimeout(
       fetchCompletedCricketIds(),
@@ -427,6 +441,14 @@ async function runSettlement() {
                 update: { $inc: { balance: payout } }
               }
             });
+            // io.to(`user:${b.userId}`).emit("wallet:update", {
+            //   ok: true,
+            //   balance: b.userBalance + payout,  // or fetch latest balance
+            //   amount: payout,
+            //   type: "bet_win",
+            //   betId: b._id,
+            //   eventId: matchId
+            // });
             txs.push({
               userId: b.userId,
               type: 'payout_win',
@@ -484,7 +506,7 @@ async function runSettlement() {
 
     // schedule periodic jobs (add small jitter to avoid exact-minute stampedes)
     const jitter = () => 500 + Math.floor(Math.random() * 1500);
-    setInterval(runFetchAndMaterialize, 10 * MIN + jitter());
+    setInterval(runFetchAndMaterialize, 5 * MIN + jitter());
     setInterval(runSettlement, 15 * 1000 + jitter());
   } catch (err) {
     console.error('[db] connection failed:', err.message);

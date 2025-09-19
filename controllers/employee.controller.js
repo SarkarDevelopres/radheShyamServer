@@ -5,7 +5,8 @@ const User = require('../db/models/user');
 
 
 exports.totalUsersDetails = async (req, res) => {
-    console.log("I am triggered!");
+    // console.log("I am triggered!");
+    
 
     try {
         // Read token from Authorization header
@@ -69,7 +70,7 @@ exports.createUser = async (req, res) => {
 
         const { username, phone, password } = req.body;
 
-        console.log("USername: ", username);
+        // console.log("USername: ", username);
 
 
         if (!username || !phone || !password) {

@@ -5,6 +5,6 @@ const EmpController = require('../controllers/employee.controller');
 router.post('/totalUsersDetails', EmpController.totalUsersDetails);
 router.post('/createUser', EmpController.createUser);
 router.post('/deductCoinsFromUser', EmpController.deductCoins);
-router.post('/addCoins', EmpController.addCoins);
+router.post('/addCoinsToUser', EmpController.addCoins);
 
 module.exports = router;
