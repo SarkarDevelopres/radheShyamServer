@@ -52,9 +52,9 @@ function initSevenUpDown(io, tableId = 'table-1') {
     io,
     game: GAME,         // <- matches socket rooms + store
     tableId,
-    roundMs: 15000,
-    betMs: 12000,
-    resultShowMs: 3000,
+    roundMs: 30000,
+    betMs: 25000,
+    resultShowMs: 5000,
     hooks: {
       // Engine calls this after scheduling timers. Keep short, return doc/plain with _id.
       onCreateRound: (p) => {

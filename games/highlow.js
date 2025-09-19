@@ -129,9 +129,9 @@ function initHighLow(io, tableId = "default") {
     io,
     game: GAME,
     tableId,
-    roundMs: 15000,      // start -> result
-    betMs: 12000,        // start -> lock (reveal baseCard here)
-    resultShowMs: 3000,  // result -> end
+    roundMs: 30000,
+    betMs: 25000,
+    resultShowMs: 5000,  // result -> end
     hooks: {
       /**
        * Create/open a round in DB (short op). Engine will emit round:start.

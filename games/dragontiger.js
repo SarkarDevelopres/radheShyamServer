@@ -69,9 +69,9 @@ function initDragonTiger(io, tableId = "default") {
     io,
     game: GAME,
     tableId,
-    roundMs: 15000,
-    betMs: 12000,
-    resultShowMs: 3000,
+    roundMs: 30000,
+    betMs: 25000,
+    resultShowMs: 5000,
 
     hooks: {
       decorateSnapshot: (snap) => {
