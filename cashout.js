@@ -4,7 +4,7 @@
 
 const r2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
 
-export function cashoutBack({ stake, originalOdds, currentLayOdds, fee = 0.05, fraction = 1 }) {
+export function cashoutBack({ stake, originalOdds, currentLayOdds, fee = 0.15, fraction = 1 }) {
   if (stake <= 0 || originalOdds <= 1 || currentLayOdds <= 1 || fraction <= 0) {
     return { held: 0, payoutNow: 0, profitNow: 0 };
   }
@@ -19,7 +19,7 @@ export function cashoutBack({ stake, originalOdds, currentLayOdds, fee = 0.05, f
   };
 }
 
-export function cashoutLay({ layStake, layOddsPlaced, currentBackOdds, fee = 0.05, fraction = 1 }) {
+export function cashoutLay({ layStake, layOddsPlaced, currentBackOdds, fee = 0.15, fraction = 1 }) {
   if (layStake <= 0 || layOddsPlaced <= 1 || currentBackOdds <= 1 || fraction <= 0) {
     return { held: 0, payoutNow: 0, profitNow: 0 };
   }
@@ -36,7 +36,7 @@ export function cashoutLay({ layStake, layOddsPlaced, currentBackOdds, fee = 0.0
 }
 
 // oddsBook: { [selection: string]: { back: number, lay: number } }
-export function cashoutForBet(bet, oddsBook, { fee = 0.05, fraction = 1 } = {}) {
+export function cashoutForBet(bet, oddsBook, { fee = 0.15, fraction = 1 } = {}) {
   const sel = bet.selectionName || bet.market || bet.team || bet.pick;
   const px = oddsBook?.[sel];
   if (!px) return { held: 0, payoutNow: 0, profitNow: 0, unavailable: true };
@@ -64,7 +64,7 @@ export function cashoutForBet(bet, oddsBook, { fee = 0.05, fraction = 1 } = {}) 
   }
 }
 
-export function cashoutForTeam(bets, selection, oddsBook, { fee = 0.05, fraction = 1 } = {}) {
+export function cashoutForTeam(bets, selection, oddsBook, { fee = 0.15, fraction = 1 } = {}) {
   let held = 0, payoutNow = 0, profitNow = 0;
   let any = false, unavailable = false;
 
@@ -85,7 +85,7 @@ export function cashoutForTeam(bets, selection, oddsBook, { fee = 0.05, fraction
   };
 }
 
-export function cashoutPortfolio(bets, oddsBook, { fee = 0.05, fraction = 1 } = {}) {
+export function cashoutPortfolio(bets, oddsBook, { fee = 0.15, fraction = 1 } = {}) {
   const perTeam = {};
   let held = 0, payoutNow = 0, profitNow = 0;
 
