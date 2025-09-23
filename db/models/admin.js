@@ -23,9 +23,12 @@ const AdminSchema = new mongoose.Schema({
         enum: ['admin', 'sub-admin'],
         required: true
     },
-    blocked: { type: Boolean, default: false },
-    maintinaince: { type: Boolean },
-    maintinainceString: { type: String },
+    maintenance: {
+        isOn: { type: Boolean, default: false },
+        string: {type: String},
+        duration: {type: String},
+        startedAt: {type: Date},
+    },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 }, { timestamps: true });
@@ -44,11 +47,5 @@ AdminSchema.pre('save', async function (next) {
 AdminSchema.methods.comparePassword = async function (enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.Password);
 };
-// AdminSchema.methods.SignAccessToken = function () {
-//     return jwt.sign({ id: this._id }, process.env.ACCESS_TOKEN || "");
-// };
-// AdminSchema.methods.SignRefreshToken = async function () {
-//     return jwt.sign({ id: this._id }, process.env.REFRESH_TOKEN || "");
-// };
 
 module.exports = mongoose.model('Admin', AdminSchema);

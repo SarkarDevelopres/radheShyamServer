@@ -7,6 +7,7 @@ const Employee = require('../db/models/employee');
 const Admin = require('../db/models/admin');
 const Odds = require('../db/models/odds');
 const Transaction = require('../db/models/transaction');
+const admin = require('../db/models/admin');
 // const bcrypt = require("bcryptjs");
 
 
@@ -789,7 +790,7 @@ exports.createEmp = async (req, res) => {
         const { name, email, phone, password } = req.body;
 
         console.log(req.body);
-        
+
         // console.log("USername: ", name);
 
 
@@ -830,3 +831,68 @@ exports.createEmp = async (req, res) => {
         return res.status(500).json({ ok: false, message: "Server error" });
     }
 };
+
+exports.checkMaintainance = async (req, res) => {
+    try {
+        let getAdminData = await Admin.findOne({ role: "admin" }).select('maintenance');
+        console.log(getAdminData);
+
+        if (getAdminData) {
+            let isMaintainance = getAdminData.maintenance.isOn;
+            if (isMaintainance) {
+                return res.status(200).json({
+                    ok: true,
+                    isMaintenance: true,
+                    duration: getAdminData.maintenance.duration,
+                    startedAt: getAdminData.maintenance.startedAt,
+                    string: getAdminData.maintenance.string,
+                })
+            }
+            return res.status(200).json({ ok: true, isMaintenance: false })
+        }
+        return res.status(200);
+
+    } catch (error) {
+        return res.status(400).json({ ok: false, isMaintenance: true, message: error.message });
+    }
+}
+
+exports.setMaintainance = async (req, res) => {
+    try {
+        const authHeader = req.headers["authorization"];
+        if (!authHeader) {
+            return res.status(401).json({ ok: false, message: "No token provided" });
+        }
+
+        // Format: "Bearer <token>"
+        const token = authHeader.split(" ")[1];
+        if (!token) {
+            return res.status(401).json({ ok: false, message: "Invalid token format" });
+        }
+
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const adminId = decoded.adminID;
+
+        if (!adminId) {
+            return res.status(401).json({ ok: false, message: "Unauthorized" });
+        }
+        const { isOn, duration, string } = req.body;
+        console.log("Initial Data:", req.body);
+
+        let currentDate = new Date();
+        let startedAt = currentDate.toISOString();
+
+        let newMaintainceData = await Admin.findOneAndUpdate({ role: "admin" }, { maintenance: { isOn, duration, string, startedAt } }, { new: true }).select("maintenance");
+
+        console.log(newMaintainceData);
+
+
+        if (newMaintainceData) {
+            return res.status(200).json({ ok: true, data: newMaintainceData.maintenance });
+        }
+        return res.status(400).json({ ok: false, message: "Error changing maintainnce" });
+    } catch (error) {
+        return res.status(500).json({ ok: false, message: "Error changing maintainnce" });
+    }
+}

@@ -14,6 +14,9 @@ router.get('/getNum', AdminController.getNumber);
 router.get('/getLiveOdds', AdminController.getLiveOdds);
 router.get('/getLiveOdds', AdminController.getLiveOdds);
 router.post('/updateOddsStream', AdminController.updateOddsStream);
+router.get('/checkmaintainance', AdminController.checkMaintainance);
+router.post('/setmaintainance', AdminController.setMaintainance);
+// router.get('/fetchmaintainance', AdminController.fetchMaintiance);
 
 // USER APIS
 router.post('/createUser', AdminController.createUser);

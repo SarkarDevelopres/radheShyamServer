@@ -150,6 +150,8 @@ class RoundEngine {
           try { snap = this.hooks.decorateSnapshot(snap) || snap; } catch (e) { console.error("decorateSnapshot error", e); }
         }
         this.io.to(this.roomKey()).emit('round:start', snap);
+        // console.log("SNAP: ",snap);
+        
         // console.log(`[engine ${this.roomKey()}] Round Created! id=${this.round?._id}`);
       })
       .catch(err => {

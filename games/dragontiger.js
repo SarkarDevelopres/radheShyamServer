@@ -1,6 +1,7 @@
 // games/dragontiger.js
 const { RoundEngine } = require("./engine");
 const { createRound, lockRound, settleRoundTx } = require("../db/store");
+const Bet = require("../db/models/bet");
 
 const RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
 const SUITS = ["hearts", "diamonds", "clubs", "spades"];
@@ -38,24 +39,58 @@ function determineOutcome(dragon, tiger) {
   return "TIE";
 }
 
-function rngDragonTiger() {
-  const dragon = drawCard();
-  const tiger = drawCard();
-  const winner = determineOutcome(dragon, tiger);
+// ---- Biased RNG for DragonTiger ----
+async function biasedDragonTiger(roundId) {
+  const bets = await Bet.find({ roundId, type: "casino", status: "OPEN" });
+
+  // Aggregate stake totals
+  const totals = {};
+  for (const b of bets) {
+    const pick = String(b.market || "").toUpperCase();
+    totals[pick] = (totals[pick] || 0) + Number(b.stake);
+  }
+
+  // Find worst exposure
+  let worst = null;
+  let maxStake = 0;
+  for (const [market, amt] of Object.entries(totals)) {
+    if (amt > maxStake) {
+      worst = market;
+      maxStake = amt;
+    }
+  }
+
+  let dragon, tiger, winner;
+
+
+  // Keep drawing until result avoids worst market
+  do {
+    dragon = drawCard();
+    tiger = drawCard();
+    winner = determineOutcome(dragon, tiger);
+  } while (
+    (worst === "DRAGON" && winner === "DRAGON") ||
+    (worst === "TIGER" && winner === "TIGER") ||
+    (worst === "TIE" && winner === "TIE") ||
+    (worst && worst.startsWith("DRAGON_") &&
+      worst.split("_")[1] === dragon.group.toUpperCase()) ||
+    (worst && worst.startsWith("DRAGON") &&
+      worst.split("_")[1] === dragon.suit.toUpperCase()) ||
+    (worst && worst.startsWith("TIGER_") &&
+      worst.split("_")[1] === tiger.group.toUpperCase()) ||
+    (worst && worst.startsWith("TIGER") &&
+      worst.split("_")[1] === tiger.suit.toUpperCase())
+  );
 
   const outcome = {
-    result: winner,   // DRAGON | TIGER | TIE
+    result: winner,
     dragonRank: dragon.rank,
     dragonSuit: dragon.suit,
     dragonGroup: dragon.group,
-    tigerRank: dragon.rank,
+    tigerRank: tiger.rank,
     tigerSuit: tiger.suit,
     tigerGroup: tiger.group,
   };
-  // console.log(winner);
-  // console.log(dragon);
-  // console.log(tiger);
-  
 
   return { dragon, tiger, outcome, odds: DRAGON_TIGER_ODDS };
 }
@@ -63,7 +98,6 @@ function rngDragonTiger() {
 function initDragonTiger(io, tableId = "default") {
   const GAME = "DRAGON_TIGER";
   const room = `${GAME}:${tableId}`;
-  const prepared = new Map();
 
   const engine = new RoundEngine({
     io,
@@ -74,43 +108,20 @@ function initDragonTiger(io, tableId = "default") {
     resultShowMs: 5000,
 
     hooks: {
-      decorateSnapshot: (snap) => {
-        const rid = snap.id;
-        const res = rid && prepared.get(rid);
-        return res
-          ? { ...snap, dragonCard: res.dragon, tigerCard: res.tiger }
-          : snap;
-      },
-
       onCreateRound: async (p) => {
         const row = await createRound(p);
-        const roundId = row._id;
-        if (!roundId) throw new Error("createRound must return roundId");
-
-        let res = prepared.get(roundId);
-        if (!res) {
-          res = rngDragonTiger();
-          prepared.set(roundId, res);
-        }
-
-        io.to(room).emit("dragontiger:cards", {
-          roundId,
-          startAt: p.startAt,
-          betsCloseAt: p.betsCloseAt,
-          resultAt: p.resultAt,
-        });
-
         return row;
       },
 
       onLock: async (roundId) => {
         await lockRound(roundId);
+        const result = await biasedDragonTiger(roundId);
+        engine._preResults.set(roundId, result);
       },
 
       onComputeResult: (roundId) => {
-        const res = prepared.get(roundId);
+        const res = engine._preResults.get(roundId);
         if (!res) throw new Error("Missing result for Dragon Tiger round");
-
         return {
           roundId,
           dragon: res.dragon,
@@ -121,11 +132,7 @@ function initDragonTiger(io, tableId = "default") {
       },
 
       onSettle: async (roundId, result) => {
-        const res = prepared.get(roundId) || result;
-        // console.log("CAME RESULTS: ",result);
-        // console.log("Stored RESULTS: ",prepared.get(roundId));
-        // console.log("REAL RESULTS: ",res);
-        
+        const res = engine._preResults.get(roundId) || result;
         await settleRoundTx({
           roundId,
           game: GAME,
@@ -140,10 +147,12 @@ function initDragonTiger(io, tableId = "default") {
       },
 
       onEnd: (roundId) => {
-        prepared.delete(roundId);
+        engine._preResults.delete(roundId);
       },
     },
   });
+
+  engine._preResults = new Map();
 
   io.on("connection", (socket) => {
     socket.on("join", ({ game, tableId: t }) => {

@@ -1,6 +1,7 @@
 // games/amarAkbarAnthony.js
 const { RoundEngine } = require('./engine');
 const { createRound, lockRound, settleRoundTx } = require('../db/store');
+const Bet = require("../db/models/bet");
 
 const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 const SUITS = ["hearts", "diamonds", "clubs", "spades"]; // 0..3
@@ -11,15 +12,9 @@ function makeDeck() {
   return deck;
 }
 
-function chooseRandomCard() {
-  const deck = makeDeck();
-  const idx = Math.floor(Math.random() * deck.length); // 0..51
-  return deck[idx];
-}
-
-function resolveOutcome() {
-  let card = chooseRandomCard();
-  let amar = false, akbar = false, anthony = false, group = "red", suit = card.suit;
+// Card → outcome mapping
+function cardToAAA(card) {
+  let amar = false, akbar = false, anthony = false;
   const rank = card.rank;
   let rankValue = 0;
   if (rank === "A") rankValue = 1;
@@ -28,30 +23,70 @@ function resolveOutcome() {
   else if (rank === "K") rankValue = 13;
   else rankValue = parseInt(rank);
 
-  // high, low, or seven
   if (rankValue < 7) amar = true;
-  else if (rankValue => 7 && rankValue < 11) akbar = true;
+  else if (rankValue >= 7 && rankValue < 11) akbar = true;
   else anthony = true;
 
-  //  red or black group
-  if (suit === "hearts" || suit === "diamonds") group = "red";
-  else group = "black";
+  const group = (card.suit === "hearts" || card.suit === "diamonds") ? "red" : "black";
+  const suit = card.suit.toLowerCase();
 
   return { amar, akbar, anthony, group, suit, card };
 }
 
+// ---- Biased RNG for AAA ----
+async function biasedAAA(roundId) {
+  const deck = makeDeck();
+  const bets = await Bet.find({ roundId, type: "casino", status: "OPEN" });
 
-/**
- * If you prefer a simple suit-based mapping instead (less uniform), you can do:
- *   hearts -> AMAR, diamonds -> AKBAR, clubs/spades -> ANTHONY
- * Just swap resolveOutcome with:
- * function resolveOutcome(card) {
- *   if (card.suit === "hearts") return "AMAR";
- *   if (card.suit === "diamonds") return "AKBAR";
- *   return "ANTHONY";
- * }
- */
+  // Aggregate totals
+  const totals = {};
+  for (const b of bets) {
+    const pick = String(b.market || "").toUpperCase(); // "AMAR"|"AKBAR"|"ANTHONY"|"RED"|"BLACK"|suits
+    totals[pick] = (totals[pick] || 0) + Number(b.stake);
+  }
 
+  // Find worst exposure
+  let worst = null;
+  let maxStake = 0;
+  for (const [market, amt] of Object.entries(totals)) {
+    if (amt > maxStake) {
+      worst = market;
+      maxStake = amt;
+    }
+  }
+
+  let filtered = deck;
+  // Bias filtering by worst
+  if (worst === "AMAR") {
+    filtered = deck.filter(c => {
+      const val = RANKS.indexOf(c.rank) + 1;
+      return !(val < 7);
+    });
+  } else if (worst === "AKBAR") {
+    filtered = deck.filter(c => {
+      const val = RANKS.indexOf(c.rank) + 1;
+      return !(val >= 7 && val < 11);
+    });
+  } else if (worst === "ANTHONY") {
+    filtered = deck.filter(c => {
+      const val = RANKS.indexOf(c.rank) + 1;
+      return !(val >= 11);
+    });
+  } else if (worst === "RED") {
+    filtered = deck.filter(c => !(c.suit === "hearts" || c.suit === "diamonds"));
+  } else if (worst === "BLACK") {
+    filtered = deck.filter(c => !(c.suit === "clubs" || c.suit === "spades"));
+  } else if (["HEARTS","DIAMONDS","CLUBS","SPADES"].includes(worst)) {
+    filtered = deck.filter(c => c.suit.toUpperCase() !== worst);
+  }
+
+  if (!filtered.length) filtered = deck;
+
+  const card = filtered[Math.floor(Math.random() * filtered.length)];
+  return cardToAAA(card);
+}
+
+// ---- Init AAA ----
 function initAAA(io, tableId = 'table-1') {
   const GAME = 'AMAR_AKBAR_ANTHONY';
 
@@ -63,36 +98,43 @@ function initAAA(io, tableId = 'table-1') {
     betMs: 25000,
     resultShowMs: 5000,
     hooks: {
-      // Create a DB round doc (keep quick)
       onCreateRound: (p) => createRound(p),
 
-      // Idempotent lock
-      onLock: async (roundId) => { await lockRound(roundId); },
+      onLock: async (roundId) => {
+        await lockRound(roundId);
+        const result = await biasedAAA(roundId);
+        engine._preResults.set(roundId, result);
+      },
 
-      // Compute result once; engine will emit exactly this object
-      onComputeResult: () => resolveOutcome(),
+      onComputeResult: (roundId) => {
+        return engine._preResults.get(roundId) || null;
+      },
 
-      // Persist settlement using the SAME result emitted above
       onSettle: async (roundId, result) => {
-        // result is { outcome, card } from onComputeResult
-        const { amar, akbar, anthony, group, suit, card } = result || resolveOutcome();
+        const res = engine._preResults.get(roundId) || result;
+        const { amar, akbar, anthony, group, suit, card } = res;
+
         let firstOutcome = "AMAR";
         if (amar) firstOutcome = "AMAR";
         else if (akbar) firstOutcome = "AKBAR";
         else if (anthony) firstOutcome = "ANTHONY";
+
         await settleRoundTx({
           roundId,
           game: GAME,
-          outcome: { firstOutcome, group, suit, card },    // "AMAR" | "AKBAR" | "ANTHONY"
-          meta: {  amar, akbar, anthony, group, suit, card} // keep full card in meta
+          outcome: { firstOutcome, group, suit, card },
+          meta: { amar, akbar, anthony, group, suit, card },
         });
       },
 
-      onEnd: async (_roundId) => { /* no-op; add analytics if needed */ },
+      onEnd: async (roundId) => {
+        engine._preResults.delete(roundId);
+      },
     },
   });
 
-  // Optional: room join helper (if you don't already have a global join)
+  engine._preResults = new Map();
+
   io.on('connection', (socket) => {
     socket.on('join', ({ game, tableId: t }) => {
       if (String(game).toUpperCase() === GAME && t === tableId) {
