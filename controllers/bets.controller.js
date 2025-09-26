@@ -70,7 +70,7 @@ exports.placeBets = async (req, res) => {
         if (findCashOut.stake>0) {
           await findCashOut.save();
         } else {
-          findCashOut.status = "CLOSED";
+          findCashOut.status = "SETTLED";
           await findCashOut.save();
         }
         const io = getIO();
