@@ -255,17 +255,17 @@ async function fetchCompletedCricketIds() {
 
 
 function testWin(userId) {
-      const io = getIO();
-      io.to(`user:${userId}`).emit("wallet:update", {
-        ok: true,
-        balance: 1234.56,   // fake balance
-        amount: 500,        // fake win amount
-        type: "bet_win",
-        betId: "test123",
-        eventId: "match_test"
-      });
-      console.log(`[test] emitted fake win to user:${userId}`);
-    }
+  const io = getIO();
+  io.to(`user:${userId}`).emit("wallet:update", {
+    ok: true,
+    balance: 1234.56,   // fake balance
+    amount: 500,        // fake win amount
+    type: "bet_win",
+    betId: "test123",
+    eventId: "match_test"
+  });
+  console.log(`[test] emitted fake win to user:${userId}`);
+}
 // ---- Jobs ----
 async function runFetchAndMaterialize() {
   // console.log('[mongo] host/db =', mongoose.connection.host, '/', mongoose.connection.name);
@@ -390,18 +390,42 @@ async function runSettlement() {
 
         // Fetch all unsettled bets for this match
         const bets = await Bet.find({
-          type: 'sports',
+          type: { $in: ["sports", "cashout"] },
           eventId: matchId,
           status: "OPEN"
         });
 
         if (!bets.length) continue;
-
         const bulkBets = [];
         const bulkUsers = [];
         const txs = [];
 
         for (const b of bets) {
+          if (b.type === "cashout") {
+            bulkBets.push({
+              updateOne: {
+                filter: { _id: b._id },
+                update: { $set: { status: "SETTLED" } }
+              }
+            });
+
+            if (b.stake > 0) {
+              bulkUsers.push({
+                updateOne: {
+                  filter: { _id: b.userId },
+                  update: { $inc: { balance: b.stake } }
+                }
+              });
+              txs.push({
+                userId: b.userId,
+                type: "cashout_win",
+                amount: b.stake,
+                meta: { betId: b._id, eventId: matchId }
+              });
+            }
+
+            continue; // skip rest
+          }
           let won = false;
           let payout = 0;
           let liability = 0;

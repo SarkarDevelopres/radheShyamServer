@@ -5,5 +5,6 @@ const BetsController = require('../controllers/bets.controller');
 router.post('/place', BetsController.placeBets);
 router.post('/take', BetsController.takeBet);
 router.post('/findMany', BetsController.findBets);
+router.post('/findCashout', BetsController.findCashout);
 
 module.exports = router;

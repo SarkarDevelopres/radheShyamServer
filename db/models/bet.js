@@ -5,7 +5,7 @@ const BetSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true, required: true },
 
   // unify: tell us which domain this bet belongs to
-  type: { type: String, enum: ['sports', 'casino'], required: true, index: true },
+  type: { type: String, enum: ['sports', 'casino', 'cashout'], required: true, index: true },
 
   // SPORTS fields
   eventId: { type: String, index: true },     // e.g. matchId from odds feed
@@ -22,7 +22,7 @@ const BetSchema = new mongoose.Schema({
   roundId: { type: mongoose.Schema.Types.ObjectId, ref: 'Round', index: true },
 
   // Common
-  stake: { type: Number, required: true, min: 1 },
+  stake: { type: Number, required: true},
   potentialPayout: { type: Number },          // precomputed if applicable
   payout: { type: Number, default: 0 },
 

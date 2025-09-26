@@ -13,7 +13,8 @@ exports.placeBets = async (req, res) => {
   // body: { matchId, selection, stake, odds, bookmakerKey }
 
   try {
-    const { token, matchId, market, bookmakerKey,selectionName, selection, stake, odds, lay, deductAmount } = req.body;
+    const { token, matchId, market, bookmakerKey, selectionName, selection, stake, odds, lay, minusAmnt } = req.body;
+    let deductAmount = minusAmnt;
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.userID;
     console.log(req.body);
@@ -26,26 +27,70 @@ exports.placeBets = async (req, res) => {
     if (!Number.isInteger(stake) || stake <= 0) return res.status(400).json({ error: 'Invalid stake' });
     if (odds <= 1) return res.status(400).json({ error: 'Invalid odds' });
 
-    let betPlacedData = await placeSportsBetTx({ userId, eventId: matchId, market, selection,selectionName, stake, odds, lay, deductAmount });
-    console.log(betPlacedData);
+    let findCashOut = await Bet.findOne({ userId: userId, eventId: matchId, status: "OPEN", type: "cashout" });
 
-    if (betPlacedData.ok) {
-      const io = getIO();
-      const sockets = await io.fetchSockets();
+    if (!findCashOut || findCashOut.stake <= 0) {
 
-      for (const sock of sockets) {
-        // console.log("I AM CALLED !");
-        // console.log("SOCK: ", sock.userID);
+      let betPlacedData = await placeSportsBetTx({ userId, eventId: matchId, market, selection, selectionName, stake, odds, lay, deductAmount });
+      console.log(betPlacedData);
 
-        if (!sock.userID) continue;  // skip game sockets
+      if (betPlacedData.ok) {
+        const io = getIO();
+        const sockets = await io.fetchSockets();
 
-        sock.emit("wallet:update", betPlacedData);
+        for (const sock of sockets) {
+          // console.log("I AM CALLED !");
+          // console.log("SOCK: ", sock.userID);
+
+          if (!sock.userID) continue;  // skip game sockets
+
+          sock.emit("wallet:update", betPlacedData);
+        }
+        res.status(200).json({ ok: true, data: betPlacedData, message: "Bet placed successfully !" });
       }
-      res.status(200).json({ ok: true, data: betPlacedData, message: "Bet placed successfully !" });
+      else {
+        res.status(300).json({ ok: false, message: "Insufficeint Balance !" });
+      }
     }
     else {
-      res.status(300).json({ ok: false, message: "Insufficeint Balance !" });
+      if (stake >= findCashOut.stake) {
+        deductAmount = stake - findCashOut.stake;
+        findCashOut.stake = 0;
+      }
+      else {
+        deductAmount = 0;
+        findCashOut.stake = findCashOut.stake - stake;
+
+      }
+      let betPlacedData = await placeSportsBetTx({ userId, eventId: matchId, market, selection, selectionName, stake, odds, lay, deductAmount });
+      console.log(betPlacedData);
+
+      if (betPlacedData.ok) {
+
+        if (findCashOut.stake>0) {
+          await findCashOut.save();
+        } else {
+          findCashOut.status = "CLOSED";
+          await findCashOut.save();
+        }
+        const io = getIO();
+        const sockets = await io.fetchSockets();
+
+        for (const sock of sockets) {
+          // console.log("I AM CALLED !");
+          // console.log("SOCK: ", sock.userID);
+
+          if (!sock.userID) continue;  // skip game sockets
+
+          sock.emit("wallet:update", betPlacedData);
+        }
+        res.status(200).json({ ok: true, data: betPlacedData, message: "Bet placed successfully !" });
+      }
+      else {
+        res.status(300).json({ ok: false, message: "Insufficeint Balance !" });
+      }
     }
+
   } catch (error) {
     res.status(200).json({ ok: false, message: error.message });
   }
@@ -81,20 +126,65 @@ exports.takeBet = async (req, res) => {
     if (result.unavailable) {
       return res.status(400).json({ ok: false, message: "Cashout unavailable" });
     }
+    // CASHOUT: {
+    //   held: 500,
+    //     payoutNow: 570.83,
+    //       profitNow: 70.83,
+    //         perTeam: {
+    //     'Tehri Queens Women': {
+    //       held: 500,
+    //         payoutNow: 570.83,
+    //           profitNow: 70.83,
+    //             unavailable: false,
+    //               any: true
+    //     }
+    //   }
+    // }
 
-    // 3. Update user balance with payoutNow
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { $inc: { balance: result.payoutNow } },
-      { new: true }
-    );
+    // CASHOUT: {
+    //   held: 500,
+    //   payoutNow: 494.99,
+    //     profitNow: -5.01,
+    //       perTeam: {
+    //   'Haridwar Storm Women': {
+    //     held: 500,
+    //       payoutNow: 494.99,
+    //         profitNow: -5.01,
+    //           unavailable: false,
+    //             any: true
+    //   }
+    // }
+    console.log("CASHOUT: ", result);
+    let user = await User.findById(userId);
 
+    if (!user) throw new Error("User not found");
+
+    if (result.profitNow > 1) {
+      user.balance += result.held;
+    } else {
+      user.balance += result.payoutNow;
+    }
+
+    await user.save();
     // 4. Mark bets as cashed out
     await Bet.updateMany(
       { eventId: matchId, userId, status: "OPEN" },
       { $set: { status: "SETTLED" } }
     );
 
+    await Bet.findOneAndUpdate(
+      { eventId: matchId, userId, type: "cashout" },
+      {
+        $set: {
+          stake: result.profitNow,
+          status: "OPEN"
+        }
+      },
+      {
+        new: true,     // return the updated doc
+        upsert: true   // create if not exists
+      }
+    );
     // 5. Emit wallet update to socket clients
     const io = getIO();
     const sockets = await io.fetchSockets();
@@ -104,13 +194,14 @@ exports.takeBet = async (req, res) => {
         sock.emit("wallet:update", { ok: true, _doc: { balance: user.balance } });
       }
     }
-
     res.status(200).json({
       ok: true,
       message: "Cashout successful",
       result,
       balance: user.balance,
     });
+
+
 
   } catch (error) {
     console.error("Cashout error:", error);
@@ -124,7 +215,21 @@ exports.findBets = async (req, res) => {
     const decoded = jwt.verify(userToken, process.env.JWT_SECRET);
     const userId = decoded.userID;
 
-    let matchBets = await Bet.find({ userId: userId, eventId: matchId, status:"OPEN" })
+    let matchBets = await Bet.find({ userId: userId, eventId: matchId, status: "OPEN", type: "sports" })
+    let cashOutBets = await Bet.find({ userId: userId, eventId: matchId, status: "OPEN", type: "cashout" })
+    res.status(200).json({ ok: true, data: matchBets, profitLoss: cashOutBets });
+
+  } catch (error) {
+    res.status(500).json({ ok: false, message: error.message })
+  }
+}
+exports.findCashout = async (req, res) => {
+  try {
+    const { matchId, userToken } = req.body;
+    const decoded = jwt.verify(userToken, process.env.JWT_SECRET);
+    const userId = decoded.userID;
+
+    let matchBets = await Bet.find({ userId: userId, eventId: matchId, status: "OPEN", type: "cashout" })
     res.status(200).json({ ok: true, data: matchBets });
 
   } catch (error) {
