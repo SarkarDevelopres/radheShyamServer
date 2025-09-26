@@ -428,20 +428,20 @@ async function runSettlement() {
           }
           let won = false;
           let payout = 0;
-          let liability = 0;
+          let liability = (b.odds - 1) * b.stake;
+
           if (!b.lay) {
             // BACK bet
             won = String(b.selection) === String(winningTeamId);
-            payout = won ? Math.round(b.stake * b.odds) : 0;
+            payout = won ? Math.round(b.stake * b.odds) : 0;   // stake + profit
           } else {
             // LAY bet
             if (String(b.selection) !== String(winningTeamId)) {
               won = true;
-              payout = b.stake; // lay wins stake amount
+              payout = Math.round(liability + b.stake);        // release liability + profit
             } else {
               won = false;
-              liability = Math.round((b.odds - 1) * b.stake);
-              payout = -liability; // show as negative in bet record
+              payout = 0;                                      // lost liability
             }
           }
 
@@ -465,6 +465,7 @@ async function runSettlement() {
                 update: { $inc: { balance: payout } }
               }
             });
+
             // io.to(`user:${b.userId}`).emit("wallet:update", {
             //   ok: true,
             //   balance: b.userBalance + payout,  // or fetch latest balance
