@@ -5,6 +5,7 @@ const Odds = require('../db/models/odds');
 const Round = require('./models/round');
 const Transaction = require('./models/transaction'); // optional but recommended
 const mongoose = require('mongoose');
+
 const SevenODDS = {
   UP: 1.9,
   DOWN: 1.9,
@@ -109,7 +110,7 @@ async function placeBetTx({ userId, game, tableId, roundId, market, stake }) {
       { $inc: { balance: -stake } },
       { new: true, session }
     );
-    if (!u) throw new Error('INSUFFICIENT FUNDS');
+    if (!u) throw new Error('INSUFFICIENT_FUNDS');
 
     const normGame = normalize(game);
     const normMarket = normalize(market);
@@ -128,8 +129,9 @@ async function placeBetTx({ userId, game, tableId, roundId, market, stake }) {
       { session }
     );
 
+    let txDoc;   // ✅ declare
     try {
-      await Transaction.create(
+      [txDoc] = await Transaction.create(
         [{
           userId,
           type: 'bet_place',
@@ -142,14 +144,28 @@ async function placeBetTx({ userId, game, tableId, roundId, market, stake }) {
     } catch (_) { }
 
     await session.commitTransaction();
-    session.endSession();
+
+    // ✅ only emit if we have a real tx
+    if (txDoc) {
+      const { getIO } = require("../socket");
+      const io = getIO();
+      io.emit("transaction:new", {
+        userId,
+        type: 'bet_place',
+        amount: -stake,
+        meta: { betId: betDoc._id, roundId, game: normGame, market: normMarket },
+      });
+    }
+
     return { ok: true, balance: u.balance };
   } catch (e) {
     await session.abortTransaction().catch(() => { });
-    session.endSession();
     return { ok: false, error: e.message };
+  } finally {
+    session.endSession();
   }
 }
+
 
 // ---------- sports bet placement (HTTP route) ----------
 async function placeSportsBetTx({ userId, eventId, market, selection, selectionName, stake, odds, lay, deductAmount }) {
@@ -166,7 +182,7 @@ async function placeSportsBetTx({ userId, eventId, market, selection, selectionN
     if (!u) throw new Error('INSUFFICIENT_FUNDS');
 
     const potentialPayout = odds ? Math.floor(stake * odds) : undefined;
-   
+
     const [betDoc] = await Bet.create(
       [{
         userId,
@@ -179,7 +195,7 @@ async function placeSportsBetTx({ userId, eventId, market, selection, selectionN
         odds,
         status: 'OPEN',
         potentialPayout,
-        lay:lay
+        lay: lay
       }],
       { session }
     );
