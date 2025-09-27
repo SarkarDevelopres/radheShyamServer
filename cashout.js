@@ -30,7 +30,7 @@ export function cashoutLay({ layStake, layOddsPlaced, currentBackOdds, fee = 0.1
   const profitAfterFee = profit * (1 - fee);
   return {
     held: liability,
-    payoutNow: liability + profitAfterFee,             // release liability + net profit/loss
+    payoutNow: liability + layStake + profitAfterFee,             // release liability + net profit/loss
     profitNow: profitAfterFee,
   };
 }
