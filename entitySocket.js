@@ -167,14 +167,19 @@ function connectEntity(onUpdate) {
 
 
         onUpdate(matchId, { kind: 'snapshot', data: data });
-
+        if (liveStatus == "Match Completed" || liveStatus == "Match completed") {
+          await Matchs.updateOne(
+            { matchId },
+            { $set: { game_state: { code: 4, string: 'Match Completed wait for 30mins for bets' }, updatedAt: new Date() } }
+          );
+        }
 
       } else if (msg?.response?.ball_event || msg?.response?.data?.over) {
         // console.log('[Entity ▶ BALL]', msg.response.ball_event);
         if (msg.response.ball_event == 'Match End') {
           await Matchs.updateOne(
             { matchId },
-            { $set: { status: 'bets_pending', updatedAt: new Date() } }
+            { $set: { game_state: { code: 4, string: 'Match Completed wait for 30mins for bets' }, updatedAt: new Date() } }
           );
           deleteMatch(matchId);
           remove(matchId);
