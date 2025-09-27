@@ -9,27 +9,24 @@ dotenv.config();
 const { getIO } = require('../socket');
 
 exports.placeBets = async (req, res) => {
-  // POST /bets/place
-  // body: { matchId, selection, stake, odds, bookmakerKey }
 
   try {
     const { token, matchId, market, bookmakerKey, selectionName, selection, stake, odds, lay, minusAmnt } = req.body;
     let deductAmount = minusAmnt;
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.userID;
-    console.log(req.body);
-
-    console.log(userId);
-
-
 
     // sanity checks
     if (!Number.isInteger(stake) || stake <= 0) return res.status(400).json({ error: 'Invalid stake' });
     if (odds <= 1) return res.status(400).json({ error: 'Invalid odds' });
 
+    if (odds > 40) {
+      return res.status(400).json({ error: 'Error cannot place bet!' });
+    }
+
     let findCashOut = await Bet.findOne({ userId: userId, eventId: matchId, status: "OPEN", type: "cashout" });
 
-    if (!findCashOut || findCashOut.stake <= 0) {
+    if (!findCashOut || findCashOut.profitHeld <= 0) {
 
       let betPlacedData = await placeSportsBetTx({ userId, eventId: matchId, market, selection, selectionName, stake, odds, lay, deductAmount });
       console.log(betPlacedData);
@@ -39,8 +36,6 @@ exports.placeBets = async (req, res) => {
         const sockets = await io.fetchSockets();
 
         for (const sock of sockets) {
-          // console.log("I AM CALLED !");
-          // console.log("SOCK: ", sock.userID);
 
           if (!sock.userID) continue;  // skip game sockets
 
@@ -53,13 +48,13 @@ exports.placeBets = async (req, res) => {
       }
     }
     else {
-      if (stake >= findCashOut.stake) {
-        deductAmount = stake - findCashOut.stake;
-        findCashOut.stake = 0;
+      if (stake >= findCashOut.profitHeld) {
+        deductAmount = stake - findCashOut.profitHeld;
+        findCashOut.profitHeld = 0;
       }
       else {
         deductAmount = 0;
-        findCashOut.stake = findCashOut.stake - stake;
+        findCashOut.profitHeld = findCashOut.profitHeld - stake;
 
       }
       let betPlacedData = await placeSportsBetTx({ userId, eventId: matchId, market, selection, selectionName, stake, odds, lay, deductAmount });
@@ -67,7 +62,7 @@ exports.placeBets = async (req, res) => {
 
       if (betPlacedData.ok) {
 
-        if (findCashOut.stake>0) {
+        if (findCashOut.profitHeld>0) {
           await findCashOut.save();
         } else {
           findCashOut.status = "SETTLED";
@@ -77,8 +72,6 @@ exports.placeBets = async (req, res) => {
         const sockets = await io.fetchSockets();
 
         for (const sock of sockets) {
-          // console.log("I AM CALLED !");
-          // console.log("SOCK: ", sock.userID);
 
           if (!sock.userID) continue;  // skip game sockets
 
@@ -94,15 +87,6 @@ exports.placeBets = async (req, res) => {
   } catch (error) {
     res.status(200).json({ ok: false, message: error.message });
   }
-
-  // try {
-
-  // } catch (error) {
-
-  // }
-
-
-
 
 }
 
@@ -126,35 +110,6 @@ exports.takeBet = async (req, res) => {
     if (result.unavailable) {
       return res.status(400).json({ ok: false, message: "Cashout unavailable" });
     }
-    // CASHOUT: {
-    //   held: 500,
-    //     payoutNow: 570.83,
-    //       profitNow: 70.83,
-    //         perTeam: {
-    //     'Tehri Queens Women': {
-    //       held: 500,
-    //         payoutNow: 570.83,
-    //           profitNow: 70.83,
-    //             unavailable: false,
-    //               any: true
-    //     }
-    //   }
-    // }
-
-    // CASHOUT: {
-    //   held: 500,
-    //   payoutNow: 494.99,
-    //     profitNow: -5.01,
-    //       perTeam: {
-    //   'Haridwar Storm Women': {
-    //     held: 500,
-    //       payoutNow: 494.99,
-    //         profitNow: -5.01,
-    //           unavailable: false,
-    //             any: true
-    //   }
-    // }
-    console.log("CASHOUT: ", result);
     let user = await User.findById(userId);
 
     if (!user) throw new Error("User not found");
@@ -176,7 +131,7 @@ exports.takeBet = async (req, res) => {
       { eventId: matchId, userId, type: "cashout" },
       {
         $set: {
-          stake: result.profitNow,
+          profitHeld: result.profitNow,
           status: "OPEN"
         }
       },

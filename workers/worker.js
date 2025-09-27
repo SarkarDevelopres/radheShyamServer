@@ -409,7 +409,7 @@ async function runSettlement() {
               }
             });
 
-            if (b.stake > 0) {
+            if (b.profitHeld > 0) {
               bulkUsers.push({
                 updateOne: {
                   filter: { _id: b.userId },
@@ -436,12 +436,13 @@ async function runSettlement() {
             payout = won ? Math.round(b.stake * b.odds) : 0;   // stake + profit
           } else {
             // LAY bet
+            const deposit = Math.round(b.stake * b.odds); // stake × odds
             if (String(b.selection) !== String(winningTeamId)) {
               won = true;
-              payout = Math.round(liability + b.stake);        // release liability + profit
+              payout = deposit + b.stake;   // return full deposit + profit
             } else {
               won = false;
-              payout = 0;                                      // lost liability
+              payout = 0;                   // lost full deposit
             }
           }
 

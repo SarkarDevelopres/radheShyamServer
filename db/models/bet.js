@@ -16,6 +16,9 @@ const BetSchema = new mongoose.Schema({
   bookmakerKey: { type: String },
   lay: { type: Boolean, default: false },
 
+  // CASHOUT fields
+  profitHeld:{ type:Number },
+
   // CASINO/GAME fields
   game: { type: String, index: true },        // e.g. 'SEVEN_UP_DOWN'
   tableId: { type: String, index: true, default: 'default' },
