@@ -17,19 +17,21 @@ function cardToOutcome(card) {
   let high = false, low = false, seven = false
   const rank = card.rank;
   let rankValue = 0;
+  let firstOutcome = "UP";
   if (rank === "A") rankValue = 1;
   else if (rank === "J") rankValue = 11;
   else if (rank === "Q") rankValue = 12;
   else if (rank === "K") rankValue = 13;
   else rankValue = parseInt(rank);
 
-  if (rankValue === 7) seven = true;
-  else if (rankValue < 7) low = true;
+  if (rankValue === 7){ seven = true; firstOutcome = "SEVEN"}
+  else if (rankValue < 7){ low = true; firstOutcome = "DOWN"}
   else high = true;
 
   const group = (card.suit === "hearts" || card.suit === "diamonds") ? "red" : "black";
-  let suit = card.suit.toLowerCase()
-  return { high, low, seven, group, suit, card };
+  let suit = card.suit.toLowerCase();
+
+  return { high, low, seven, firstOutcome, group, suit, card };
 }
 
 // Biased RNG → excludes the market with the highest exposure
@@ -112,7 +114,11 @@ function initSevenUpDown(io, tableId = 'table-1') {
 
       // Biased RNG is computed here
       onComputeResult: (roundId) => {
-        return engine._preResults.get(roundId) || null;
+        const res = engine._preResults.get(roundId);
+        console.log("7UpDown: ",res);
+        
+        if (!res) return null;
+        return res;
       },
 
       onSettle: async (roundId, result) => {

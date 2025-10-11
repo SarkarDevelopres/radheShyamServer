@@ -1,5 +1,5 @@
 // workers/worker.js
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const mongoose = require('mongoose');
 const Matchs = require('../db/models/match');
 const Odds = require('../db/models/odds');
@@ -20,6 +20,7 @@ const memCache = new Map();
 // ---- Constants ----
 const MIN = 60 * 1000;
 const SPORTS = ['cricket', 'soccer', 'tennis', 'basketball_nba', 'baseball'];
+// const SPORTS = ['tennis'];
 
 const DURATIONS = {
   SOCCER: 120 * MIN,
@@ -77,6 +78,107 @@ function expectedEnd(commenceTimeIsoOrDate, category) {
   return new Date(start.getTime() + DURATIONS[category]);
 }
 
+function buildTennisSessionOdds(matchOdds, teama, teamb) {
+  const first = (obj) => {
+    if (!obj) return null;
+    const val = Object.values(obj)[0];
+    return val ? Number(val) : null;
+  };
+
+  const sessionOdds = [];
+
+  // 1️⃣ Match Winner
+  if (matchOdds["Home/Away"]) {
+    const home = first(matchOdds["Home/Away"].Home);
+    const away = first(matchOdds["Home/Away"].Away);
+    sessionOdds.push({
+      name: "Match Winner",
+      selections: [
+        { side: "Home", name: teama, price: home },
+        { side: "Away", name: teamb, price: away }
+      ]
+    });
+  }
+
+  // 2️⃣ Set Winners
+  for (const set of ["1st", "2nd"]) {
+    const key = `Home/Away (${set} Set)`;
+    if (matchOdds[key]) {
+      const home = first(matchOdds[key].Home);
+      const away = first(matchOdds[key].Away);
+      sessionOdds.push({
+        name: `${set} Set Winner`,
+        selections: [
+          { side: "Home", name: teama, price: home },
+          { side: "Away", name: teamb, price: away }
+        ]
+      });
+    }
+  }
+
+  // 3️⃣ Odd/Even Markets
+  for (const label of ["Odd/Even", "Odd/Even (1st Set)", "Odd/Even (2nd Set)"]) {
+    if (matchOdds[label]) {
+      const odd = first(matchOdds[label].Odd);
+      const even = first(matchOdds[label].Even);
+      sessionOdds.push({
+        name: label,
+        selections: [
+          { name: "Odd", price: odd },
+          { name: "Even", price: even }
+        ]
+      });
+    }
+  }
+
+  // 4️⃣ Set Betting
+  if (matchOdds["Set Betting"]) {
+    const selections = Object.entries(matchOdds["Set Betting"]).map(([score, odds]) => ({
+      name: score,
+      price: first(odds)
+    }));
+    sessionOdds.push({ name: "Set Betting", selections });
+  }
+
+  // 5️⃣ Set / Match Combo
+  if (matchOdds["Set / Match"]) {
+    const selections = Object.entries(matchOdds["Set / Match"]).map(([score, odds]) => ({
+      name: score,
+      price: first(odds)
+    }));
+    sessionOdds.push({ name: "Set/Match Combo", selections });
+  }
+
+  // 6️⃣ Team Totals per Set
+  for (const set of ["1st", "2nd"]) {
+    const homeKey = `Home Team Total (${set} Set)`;
+    const awayKey = `Away Team Total (${set} Set)`;
+
+    if (matchOdds[homeKey]) {
+      sessionOdds.push({
+        name: `${teama} Total (${set} Set)`,
+        selections: [
+          { name: "Over", price: first(matchOdds[homeKey].Over) },
+          { name: "Under", price: first(matchOdds[homeKey].Under) }
+        ]
+      });
+    }
+
+    if (matchOdds[awayKey]) {
+      sessionOdds.push({
+        name: `${teamb} Total (${set} Set)`,
+        selections: [
+          { name: "Over", price: first(matchOdds[awayKey].Over) },
+          { name: "Under", price: first(matchOdds[awayKey].Under) }
+        ]
+      });
+    }
+  }
+
+  return sessionOdds.length ? sessionOdds : [];
+}
+
+
 // ---- Provider calls ----
 async function fetchMatchesFromProvider(sport) {
   if (sport === 'cricket') {
@@ -114,6 +216,118 @@ async function fetchMatchesFromProvider(sport) {
         game_state: { code: it.game_state, string: it.game_state_str },
         isOdds: true,
         sessionOdds: !!it.session_odds_available
+      });
+    }
+    return matchList;
+  }
+
+  else if (sport == "tennis") {
+    console.log("I am called");
+
+    const matchList = [];
+    let dateNow = new Date();
+    let today = dateNow.toISOString().split('T')[0];
+
+    const nextWeek = new Date(dateNow); // clone dateNow, not today string
+    nextWeek.setDate(dateNow.getDate() + 7);
+    const nextWeekDate = nextWeek.toISOString().split('T')[0];
+
+    const apiTennisUrl = `https://api.api-tennis.com/tennis/?method=get_fixtures&APIkey=${process.env.API_TENNIS_KEY}&date_start=${today}&date_stop=${nextWeekDate}&timezone=Asia/Kolkata`;
+
+    let tennisGames = await fetch(apiTennisUrl);
+    let tennisRaw = await tennisGames.json();
+
+
+    const filtered = Array.isArray(tennisRaw.result)
+      ? tennisRaw.result.filter(
+        (match) => match.event_status === "" || match.event_live === "1"
+      )
+      : [];
+
+    // console.log("Tennis Raw Data:", filtered);
+
+    for (it of filtered) {
+
+      const event_date = it.event_date;
+      const event_time = it.event_time; // assuming the API gives this separately
+
+      const start = new Date(`${event_date}T${event_time}:00+05:30`); // IST
+      const start_time = start.getTime(); // ms
+      const start_time_ist = start.toLocaleString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
+      const end_time = start_time + 3 * 60 * 60 * 1000; // assume avg 3 hrs duration
+      const end_time_ist = new Date(end_time).toLocaleString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
+      let rawStatus = (it.event_status || "").toLowerCase();
+      let status = "scheduled"; // default
+
+      if (rawStatus === "finished") {
+        status = "completed";
+      } else if (rawStatus.includes("set") || it.event_live === "1") {
+        status = "live";
+      } else {
+        status = "scheduled";
+      }
+
+      let game_state_code = 0;
+      let game_state_string = "";
+
+      if (it.event_status === "") {
+        game_state_code = 1;
+        game_state_string = "Scheduled";
+      } else if (it.event_status.toLowerCase() === "finished") {
+        game_state_code = 5;
+        game_state_string = "Completed";
+      } else if (it.event_status.toLowerCase().includes("set") || it.event_live === "1") {
+        game_state_code = 3;
+        game_state_string = "Play Ongoing";
+      } else {
+        game_state_code = 0;
+        game_state_string = "Suspended";
+      }
+
+      const game_state = {
+        code: game_state_code,
+        string: game_state_string,
+      };
+      matchList.push({
+        matchId: String(it.event_key),
+        sport: 'tennis',
+        sportKey: 'tennis',
+        teamHome: {
+          name: it.event_first_player,
+          side: "Home",
+          team_id: "First Player",
+          player_id: it.first_player_key,
+        },
+        teamAway: {
+          name: it.event_second_player,
+          side: "Away",
+          team_id: "Second Player",
+          player_id: it.second_player_key
+        },
+        title: it.tournament_name,
+        start_time: start_time,
+        end_time: end_time,
+        category: it.event_type_type,
+        start_time_ist: start_time_ist,
+        end_time_ist: end_time_ist,
+        status: status,
+        game_state: game_state,
+        isOdds: true,
+        sessionOdds: true
       });
     }
     return matchList;
@@ -177,9 +391,6 @@ async function fetchOddsBatch(sport, matchIds, nameById) {
 
     for (const mid of matchIds) {
       const r = response[mid];
-      // if (mid=='91903') {
-      //   console.log(r);        
-      // }
       const mo = r?.live_odds?.matchodds;
       if (!mo) continue;
 
@@ -205,7 +416,69 @@ async function fetchOddsBatch(sport, matchIds, nameById) {
     }
     return oddsList;
   }
+  else if (sport === 'tennis') {
+    // console.log("Name-Id:", nameById);
 
+    let dateNow = new Date();
+    let today = dateNow.toISOString().split('T')[0];
+
+    const nextWeek = new Date(dateNow); // clone dateNow, not today string
+    nextWeek.setDate(dateNow.getDate() + 7);
+    const nextWeekDate = nextWeek.toISOString().split('T')[0];
+
+    const tennisOddsUrl = `https://api.api-tennis.com/tennis/?method=get_odds&APIkey=${process.env.API_TENNIS_KEY}&date_start=${today}&date_stop=${nextWeekDate}`
+
+    let apiRes = await fetch(tennisOddsUrl);
+    let response = await apiRes.json();
+
+    if (response.success != 1) return [];
+
+
+    const oddsList = [];
+    const oddsResult = response.result || {};
+
+    for (const mid of matchIds.map(String)) {
+      const matchOdds = oddsResult[mid];
+
+
+      if (!matchOdds) continue;
+
+      const market = matchOdds["Home/Away"];
+
+      if (!market) continue;
+      const homeOdds = Object.values(market.Home || {})[0];
+      const awayOdds = Object.values(market.Away || {})[0];
+
+      if (!homeOdds && !awayOdds) continue;
+
+      const names = nameById.get(String(mid)) || {};
+      const teamA = names.teama || "Player A";
+      const teamB = names.teamb || "Player B";
+
+      // console.log("MatchOdds: ", matchOdds);
+
+      let sessionOdds = buildTennisSessionOdds(matchOdds, teamA, teamB);
+
+      oddsList.push({
+        matchId: String(mid),
+        sport: "tennis",
+        sportKey: "tennis",
+        bookmakerKey: "api-tennis",
+        marketKey: "h2h", // same as cricket for head-to-head
+        isBet: false,
+        provider: "api-tennis",
+        odds: [
+          { name: teamA, price: homeOdds ? Number(homeOdds) : null },
+          { name: teamB, price: awayOdds ? Number(awayOdds) : null }
+        ],
+        sessionOdds: [] // tennis doesn’t have session odds
+      });
+
+    }
+
+    return oddsList;
+
+  }
   // OddsAPI branch: one doc per market
   const oddsUrl =
     `https://api.the-odds-api.com/v4/sports/${sport}/odds/?regions=uk&markets=h2h,h2h_lay&apiKey=${process.env.ODDS_API_KEY}`;
@@ -277,7 +550,7 @@ async function runFetchAndMaterialize() {
 
   for (const sport of SPORTS) {
     try {
-      // console.log(`[worker] → ${sport}: fetching fixtures`);
+      console.log(`[worker] → ${sport}: fetching fixtures`);
       const matches = await withTimeout(fetchMatchesFromProvider(sport), 25_000, `fixtures:${sport}`);
 
       // upsert matches
@@ -291,6 +564,8 @@ async function runFetchAndMaterialize() {
         }));
         const r = await Matchs.bulkWrite(matchOps, { ordered: false });
         // console.log('[matches.bulkWrite] matched=', r.matchedCount, ' modified=', r.modifiedCount, ' upserted=', r.upsertedCount);
+        // console.log(matches);
+
       }
       totalMatches += matches.length;
 
@@ -318,11 +593,6 @@ async function runFetchAndMaterialize() {
               const match = matches.find(m => m.matchId === d.matchId);
 
               let finalOdds = d.sessionOdds;
-              if (d.matchId == '91903') {
-                // console.log(finalOdds);
-
-              }
-
               // If suspended or live+session odds → empty array
               if (match?.status === 'live') {
                 finalOdds = [];

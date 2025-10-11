@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const dbUrl = process.env.DB_URI + '?maxPoolSize=50&serverSelectionTimeoutMS=5000';
 

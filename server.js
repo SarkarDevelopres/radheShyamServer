@@ -1,11 +1,12 @@
 // server.js
-require('dotenv').config();
+process.env.DOTENV_CONFIG_QUIET = 'true';
+require('dotenv').config({ quiet: true });
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const path = require('path');
 const mongoose = require('mongoose');
-const { connectEntityInspector } = require('./entityLogger');
+const { connectTennis } = require('./tennisSocket');
 const { connectEntity } = require('./entitySocket');
 const { getIO } = require('./socket');
 
@@ -91,6 +92,14 @@ async function main() {
     // emit immediately:
     getIO().to(`live:match:${matchId}`).emit('score:update', latestSnapshot);
     debounceBroadcast(matchId, latestSnapshot);
+
+  });
+
+  connectTennis((matchId, latestSnapshot) => {
+    // emit immediately:
+    getIO().to(`live:match:${matchId}`).emit('score:update', latestSnapshot);
+    debounceBroadcast(matchId, latestSnapshot);
+
   });
 
   const PORT = process.env.PORT || 4000;

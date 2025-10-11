@@ -16,7 +16,9 @@ const handleSport = async (req, res, sport) => {
     for (const o of odds) {
       oddsMap.set(String(o.matchId), { odds: o.odds }); // o.odds should already be an array
     }
-
+     console.log("Matchs: ", matchs);
+     console.log("Odds: ", odds);
+     
     const view = matchs
       .map(m => {
         const o = oddsMap.get(String(m.matchId));
