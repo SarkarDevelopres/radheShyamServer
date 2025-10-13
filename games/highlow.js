@@ -381,7 +381,7 @@ function initHighLow(io, tableId = "default") {
         // pick base card upfront
         const deck = makeDeck();
         const baseCard = deck[Math.floor(Math.random() * deck.length)];
-        console.log("BASECARD: ", baseCard);
+        // console.log("BASECARD: ", baseCard);
 
         // store base card only
         const odds = getDynamicHighLowOdds(baseCard);

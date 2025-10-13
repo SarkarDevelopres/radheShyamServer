@@ -115,7 +115,6 @@ function initSevenUpDown(io, tableId = 'table-1') {
       // Biased RNG is computed here
       onComputeResult: (roundId) => {
         const res = engine._preResults.get(roundId);
-        console.log("7UpDown: ",res);
         
         if (!res) return null;
         return res;

@@ -4,6 +4,8 @@ dotenv.config();
 const Odds = require('../db/models/odds');
 const Matchs = require('../db/models/match');
 
+const SPORTS = ['cricket', 'tennis'];
+
 const handleSport = async (req, res, sport) => {
   try {
     const [matchs, odds] = await Promise.all([
@@ -16,9 +18,9 @@ const handleSport = async (req, res, sport) => {
     for (const o of odds) {
       oddsMap.set(String(o.matchId), { odds: o.odds }); // o.odds should already be an array
     }
-     console.log("Matchs: ", matchs);
-     console.log("Odds: ", odds);
-     
+    //  console.log("Matchs: ", matchs);
+    //  console.log("Odds: ", odds);
+
     const view = matchs
       .map(m => {
         const o = oddsMap.get(String(m.matchId));
@@ -97,42 +99,48 @@ exports.cricketLive = async (req, res) => {
 };
 
 
-exports.otherLive = async (req, res) => {
+exports.live = async (req, res) => {
   try {
-    const result = {};
+    let liveData = [];
 
     await Promise.all(
       SPORTS.map(async (sport) => {
         try {
-          // Step 1: pull fresh (<= 30min old) rows from DB
-          let rows = await queryFreshRows(sport);
-
-          // Step 2: if none fresh, hit upstream then requery
-          if (rows.length === 0) {
-            try {
-              await fetchAndUpsertFromAPI(sport);
-              rows = await queryFreshRows(sport);
-            } catch (err) {
-              console.error(`[odds.live] fetch fail for ${sport}:`, err.message);
-              rows = []; // keep going; other sports may still succeed
-            }
+          const [matchs, odds] = await Promise.all([
+            Matchs.find({ sport, status: "live" }).lean(),
+            Odds.find({ sport }).lean(), // odds may not have status field
+          ]);
+          
+          // Build odds lookup: matchId -> odds array
+          const oddsMap = new Map();
+          for (const o of odds) {
+            oddsMap.set(String(o.matchId), o.odds);
           }
-
-          // Step 3: keep only live rows, map to client shape, sort by start
-          const liveRows = rows
-            .filter((r) => computeIsLive(r))
-            .map(toClientRow)
-            .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
-
-          result[sport] = liveRows;
+          
+          // Only include matches that also have odds
+          const view = matchs
+          .filter(m => oddsMap.has(String(m.matchId))) // ensure odds exist
+          .map(m => ({
+            teamHome: m.teamHome,
+            teamAway: m.teamAway,
+            title: m.title,
+            start_time: m.start_time_ist,
+            status: m.status,
+            matchId: m.matchId,
+            odds: oddsMap.get(String(m.matchId)) || [], // guaranteed to have odds
+          }));
+          console.log(sport);
+          console.log(view);
+          
+          liveData.push({ [sport]: view });
         } catch (e) {
           console.error(`[odds.live] error for ${sport}:`, e);
-          result[sport] = [];
         }
       })
     );
-
-    return res.json({ success: true, data: result });
+     console.log(liveData);
+     
+    return res.json({ success: true, data: liveData });
   } catch (e) {
     console.error('[odds.live] fatal:', e);
     return res.status(500).json({ success: false, error: 'Failed to fetch live odds' });
@@ -220,3 +228,17 @@ exports.allSports = async (req, res) => {
   }
 };
 
+
+
+exports.tennisLive = async (req, res) => {
+  const matchId = req.query.matchId;
+  let url = `https://api.api-tennis.com/tennis/?method=get_live_odds&match_key=${matchId}&APIkey=${process.env.API_TENNIS_KEY}&timezone=Asia/Kolkata`;
+  let liveOddsRes = await fetch(url);
+  let liveOddsData = await liveOddsRes.json();
+  let liveOdds = liveOddsData.result[matchId].live_odds;
+
+  // console.log(liveOddsData.result[matchId].live_odds);
+
+  return res.status(200).json({ ok: true, data: liveOdds });
+
+}

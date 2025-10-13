@@ -36,8 +36,13 @@ function isWatched(matchId) {
   return watchers.has(matchId);
 }
 
+function watchedList(){
+  return Array.from(watchers.keys());
+}
+
 module.exports = {
   add,
   remove,
   isWatched,
+  watchedList
 };

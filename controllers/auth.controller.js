@@ -11,7 +11,7 @@ exports.login = async (req, res) => {
     try {
         const { username, password } = req.body;
 
-        let existingUser = await User.findOne({ "username": username }).select('password balance');
+        let existingUser = await User.findOne({ "username": username }).select('password exp');
 
         console.log(existingUser);
 
@@ -29,7 +29,7 @@ exports.login = async (req, res) => {
         );
 
         console.log(existingUser);
-        res.status(201).json({ message: 'User logged In', success: true, token, balance: existingUser.balance });
+        res.status(201).json({ message: 'User logged In', success: true, token, balance: existingUser.exp });
 
     } catch (err) {
         console.log(err);

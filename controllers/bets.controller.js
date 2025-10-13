@@ -40,6 +40,7 @@ exports.placeBets = async (req, res) => {
           if (!sock.userID) continue;  // skip game sockets
 
           sock.emit("wallet:update", betPlacedData);
+          sock.emit("exp:update", betPlacedData);
         }
         res.status(200).json({ ok: true, data: betPlacedData, message: "Bet placed successfully !" });
       }
@@ -76,6 +77,7 @@ exports.placeBets = async (req, res) => {
           if (!sock.userID) continue;  // skip game sockets
 
           sock.emit("wallet:update", betPlacedData);
+          sock.emit("exp:update", betPlacedData);
         }
         res.status(200).json({ ok: true, data: betPlacedData, message: "Bet placed successfully !" });
       }
@@ -147,6 +149,7 @@ exports.takeBet = async (req, res) => {
       if (!sock.userID) continue;
       if (sock.userID.toString() === userId.toString()) {
         sock.emit("wallet:update", { ok: true, _doc: { balance: user.balance } });
+        sock.emit("exp:update", { ok: true, _doc: { balance: user.balance } });
       }
     }
     res.status(200).json({

@@ -1,6 +1,6 @@
 // socket.js
 const { Server } = require("socket.io");
-const { placeBetTx, fetchBalance } = require("./db/store");
+const { placeBetTx, fetchBalance, fetchExp } = require("./db/store");
 const { initSevenUpDown } = require("./games/sevenUpDown");
 const { initHighLow } = require("./games/highlow");
 const { initAAA } = require("./games/aaa");
@@ -55,7 +55,8 @@ function attachSocket(server) {
     
     socket.on('watch:join', (matchId) => {
       if (!matchId) return;
-      add(matchId)
+      add(matchId);
+      
       console.log("Socket Match ID:", matchId);
       
       const room = `live:match:${matchId}`;
@@ -90,6 +91,11 @@ function attachSocket(server) {
       // In your case, the server is the one emitting, so this won't normally trigger.
       console.log(`[socket] wallet:update received on server for socket ${socket.id}`, data);
     });
+    socket.on("exp:update", (data) => {
+      // This will only fire if a CLIENT emits wallet:update (not in your flow).
+      // In your case, the server is the one emitting, so this won't normally trigger.
+      console.log(`[socket] wallet:update received on server for socket ${socket.id}`, data);
+    });
 
     // Join a game/table room to get lifecycle events
     socket.on("join", ({ game, tableId }) => {
@@ -111,14 +117,31 @@ function attachSocket(server) {
 
     socket.on("wallet:fetch", async ({ userId }, cb) => {
       try {
-        console.log("RECIEVED TOKEN :", userId);
+        // console.log("RECIEVED TOKEN :", userId);
 
         const decoded = jwt.verify(userId, process.env.JWT_SECRET);
         // console.log("DECODED TOKEN :", decoded);
         const userID = decoded.userID;
         const data = await fetchBalance(userID);
         // e.g. { balance: number }
-        console.log("DATA: ", data);
+        // console.log("DATA: ", data);
+
+        cb?.({ ok: true, ...data });
+      } catch (e) {
+        console.error("[wallet:fetch] error:", e);
+        cb?.({ ok: false, error: e?.message || "Failed to fetch balance" });
+      }
+    });
+    socket.on("exp:fetch", async ({ userId }, cb) => {
+      try {
+        // console.log("RECIEVED TOKEN :", userId);
+
+        const decoded = jwt.verify(userId, process.env.JWT_SECRET);
+        // console.log("DECODED TOKEN :", decoded);
+        const userID = decoded.userID;
+        const data = await fetchExp(userID);
+        // e.g. { balance: number }
+        // console.log("DATA: ", data);
 
         cb?.({ ok: true, ...data });
       } catch (e) {

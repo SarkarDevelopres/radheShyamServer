@@ -222,7 +222,6 @@ async function fetchMatchesFromProvider(sport) {
   }
 
   else if (sport == "tennis") {
-    console.log("I am called");
 
     const matchList = [];
     let dateNow = new Date();
@@ -471,7 +470,7 @@ async function fetchOddsBatch(sport, matchIds, nameById) {
           { name: teamA, price: homeOdds ? Number(homeOdds) : null },
           { name: teamB, price: awayOdds ? Number(awayOdds) : null }
         ],
-        sessionOdds: [] // tennis doesn’t have session odds
+        sessionOdds: sessionOdds // tennis doesn’t have session odds
       });
 
     }
@@ -509,6 +508,8 @@ async function fetchOddsBatch(sport, matchIds, nameById) {
   return docs.filter(d => matchIds.includes(d.matchId));
 }
 
+
+
 async function fetchCompletedCricketIds() {
   const url = `https://restapi.entitysport.com/exchange/matches/?status=2&token=${process.env.ENTITY_TOKEN}`;
   const res = await fetch(url);
@@ -526,7 +527,173 @@ async function fetchCompletedCricketIds() {
     .filter(it => Boolean(it.matchId));
 }
 
+async function fetchCompletedFootballIds(){
+  try {
+    return [];
+  } catch (error) {
+    console.log(error);
+    
+  }
+}
 
+async function fetchCompletedTennisIds() {
+  let dateNow = new Date();
+  let today = dateNow.toISOString().split('T')[0];
+
+  const nextWeek = new Date(dateNow); // clone dateNow, not today string
+  nextWeek.setDate(dateNow.getDate() + 7);
+  const nextWeekDate = nextWeek.toISOString().split('T')[0];
+
+  const apiTennisUrl = `https://api.api-tennis.com/tennis/?method=get_fixtures&APIkey=${process.env.API_TENNIS_KEY}&date_start=${today}&date_stop=${nextWeekDate}&timezone=Asia/Kolkata`;
+
+  const res = await fetch(apiTennisUrl);
+  const data = await res.json();
+  const result = data.result || [];
+
+  return result.filter(it => it.event_status === 'Finished')
+    .map(it => ({
+      matchId: String(it.event_key),
+      winningTeamId: String(it.event_winner)
+    }))
+    .filter(it => Boolean(it.matchId));
+}
+
+
+async function fetchCompletedMatchesBySport(sport) {
+  switch (sport) {
+    case 'cricket': return await fetchCompletedCricketIds();
+    case 'football': return await fetchCompletedFootballIds();
+    case 'tennis': return await fetchCompletedTennisIds();
+    // add more providers later
+    default: return [];
+  }
+}
+
+async function settleSportMatches(sport, completed) {
+
+  try {
+    if (completed.length) {
+      // Update match status → completed
+      const ids = completed.map(m => m.matchId);
+      const res = await Matchs.updateMany(
+        { sport: `${sport}`, matchId: { $in: ids }, status: { $ne: 'completed' } },
+        { $set: { status: 'completed', updatedAt: new Date() } }
+      );
+      console.log(
+        `[settle] ${sport} completed → matched:`,
+        res.matchedCount ?? res.n,
+        ' modified:',
+        res.modifiedCount ?? res.nModified
+      );
+
+      // ---- NEW: settle sports bets ----
+      for (const { matchId, winningTeamId } of completed) {
+        if (!winningTeamId) continue;
+        if (!winningTeamId || winningTeamId === 'null' || winningTeamId === '-') continue;
+
+        // Fetch all unsettled bets for this match
+        const bets = await Bet.find({
+          type: { $in: ["sports", "cashout"] },
+          eventId: matchId,
+          status: "OPEN"
+        });
+
+        if (!bets.length) continue;
+        const bulkBets = [];
+        const bulkUsers = [];
+        const txs = [];
+
+        for (const b of bets) {
+          if (b.type === "cashout") {
+            bulkBets.push({
+              updateOne: {
+                filter: { _id: b._id },
+                update: { $set: { status: "SETTLED" } }
+              }
+            });
+
+            if (b.profitHeld > 0) {
+              bulkUsers.push({
+                updateOne: {
+                  filter: { _id: b.userId },
+                  update: { $inc: { balance: b.stake } }
+                }
+              });
+              txs.push({
+                userId: b.userId,
+                type: "cashout_win",
+                amount: b.stake,
+                meta: { betId: b._id, eventId: matchId }
+              });
+            }
+
+            continue; // skip rest
+          }
+          let won = false;
+          let payout = 0;
+          let liability = (b.odds - 1) * b.stake;
+
+          if (!b.lay) {
+            // BACK bet
+            won = String(b.selection) === String(winningTeamId);
+            payout = won ? Math.round(b.stake * b.odds) : 0;   // stake + profit
+          } else {
+            // LAY bet
+            const deposit = Math.round(b.stake * b.odds); // stake × odds
+            if (String(b.selection) !== String(winningTeamId)) {
+              won = true;
+              payout = deposit + b.stake;   // return full deposit + profit
+            } else {
+              won = false;
+              payout = 0;                   // lost full deposit
+            }
+          }
+
+          bulkBets.push({
+            updateOne: {
+              filter: { _id: b._id },
+              update: {
+                $set: {
+                  status: won ? 'WON' : 'LOST',
+                  won,
+                  payout,
+                }
+              }
+            }
+          });
+
+          if (payout > 0) {
+            bulkUsers.push({
+              updateOne: {
+                filter: { _id: b.userId },
+                update: { $inc: { balance: payout } }
+              }
+            });
+
+
+            txs.push({
+              userId: b.userId,
+              type: 'payout_win',
+              amount: payout,
+              meta: { betId: b._id, eventId: matchId }
+            });
+          }
+        }
+
+        if (bulkBets.length) await Bet.bulkWrite(bulkBets);
+        if (bulkUsers.length) await User.bulkWrite(bulkUsers);
+        if (txs.length) await Transaction.insertMany(txs);
+
+        console.log(`[settle] bets settled for match ${matchId}: total=${bets.length}`);
+      }
+    } else {
+      console.log(`[settle] no completed for ${sport} matches from provider`);
+    }
+
+  } catch (e) {
+    console.error('[settle] error:', e.message);
+  }
+}
 function testWin(userId) {
   const io = getIO();
   io.to(`user:${userId}`).emit("wallet:update", {
@@ -626,163 +793,28 @@ async function runFetchAndMaterialize() {
   // save merged cache once
   memCache.set('nameById', globalNameById);
 
-  // console.log(`[worker] ✓ refresh done in ${Date.now() - started}ms  matches:${totalMatches} odds:${totalOdds}`);
+  console.log(`[worker] ✓ refresh done in ${Date.now() - started}ms  matches:${totalMatches} odds:${totalOdds}`);
 }
+// const io = getIO();
+// testWin("68ada5984140021fe4bd57a0")
+// 1) Fetch provider’s completed matches (with winners)
+
+
+// io.to(`user:${b.userId}`).emit("wallet:update", {
+//   ok: true,
+//   balance: b.userBalance + payout,  // or fetch latest balance
+//   amount: payout,
+//   type: "bet_win",
+//   betId: b._id,
+//   eventId: matchId
+// });
 
 async function runSettlement() {
-  try {
-    // const io = getIO();
-    // testWin("68ada5984140021fe4bd57a0")
-    // 1) Fetch provider’s completed matches (with winners)
-    const completed = await withTimeout(
-      fetchCompletedCricketIds(),
-      20_000,
-      'completed:cricket'
-    );
-
-    if (completed.length) {
-      // Update match status → completed
-      const ids = completed.map(m => m.matchId);
-      const res = await Matchs.updateMany(
-        { sport: 'cricket', matchId: { $in: ids }, status: { $ne: 'completed' } },
-        { $set: { status: 'completed', updatedAt: new Date() } }
-      );
-      console.log(
-        '[settle] cricket completed → matched:',
-        res.matchedCount ?? res.n,
-        ' modified:',
-        res.modifiedCount ?? res.nModified
-      );
-
-      // ---- NEW: settle sports bets ----
-      for (const { matchId, winningTeamId } of completed) {
-        if (!winningTeamId) continue;
-
-        // Fetch all unsettled bets for this match
-        const bets = await Bet.find({
-          type: { $in: ["sports", "cashout"] },
-          eventId: matchId,
-          status: "OPEN"
-        });
-
-        if (!bets.length) continue;
-        const bulkBets = [];
-        const bulkUsers = [];
-        const txs = [];
-
-        for (const b of bets) {
-          if (b.type === "cashout") {
-            bulkBets.push({
-              updateOne: {
-                filter: { _id: b._id },
-                update: { $set: { status: "SETTLED" } }
-              }
-            });
-
-            if (b.profitHeld > 0) {
-              bulkUsers.push({
-                updateOne: {
-                  filter: { _id: b.userId },
-                  update: { $inc: { balance: b.stake } }
-                }
-              });
-              txs.push({
-                userId: b.userId,
-                type: "cashout_win",
-                amount: b.stake,
-                meta: { betId: b._id, eventId: matchId }
-              });
-            }
-
-            continue; // skip rest
-          }
-          let won = false;
-          let payout = 0;
-          let liability = (b.odds - 1) * b.stake;
-
-          if (!b.lay) {
-            // BACK bet
-            won = String(b.selection) === String(winningTeamId);
-            payout = won ? Math.round(b.stake * b.odds) : 0;   // stake + profit
-          } else {
-            // LAY bet
-            const deposit = Math.round(b.stake * b.odds); // stake × odds
-            if (String(b.selection) !== String(winningTeamId)) {
-              won = true;
-              payout = deposit + b.stake;   // return full deposit + profit
-            } else {
-              won = false;
-              payout = 0;                   // lost full deposit
-            }
-          }
-
-          bulkBets.push({
-            updateOne: {
-              filter: { _id: b._id },
-              update: {
-                $set: {
-                  status: won ? 'WON' : 'LOST',
-                  won,
-                  payout,
-                }
-              }
-            }
-          });
-
-          if (payout > 0) {
-            bulkUsers.push({
-              updateOne: {
-                filter: { _id: b.userId },
-                update: { $inc: { balance: payout } }
-              }
-            });
-
-            // io.to(`user:${b.userId}`).emit("wallet:update", {
-            //   ok: true,
-            //   balance: b.userBalance + payout,  // or fetch latest balance
-            //   amount: payout,
-            //   type: "bet_win",
-            //   betId: b._id,
-            //   eventId: matchId
-            // });
-            txs.push({
-              userId: b.userId,
-              type: 'payout_win',
-              amount: payout,
-              meta: { betId: b._id, eventId: matchId }
-            });
-          }
-        }
-
-        if (bulkBets.length) await Bet.bulkWrite(bulkBets);
-        if (bulkUsers.length) await User.bulkWrite(bulkUsers);
-        if (txs.length) await Transaction.insertMany(txs);
-
-        console.log(`[settle] bets settled for match ${matchId}: total=${bets.length}`);
-      }
-    } else {
-      console.log('[settle] no completed cricket matches from provider');
-    }
-
-    // 2) Handle all other sports (time-driven)
-    const now = Date.now();
-    const otherRes = await Matchs.updateMany(
-      {
-        sport: { $ne: 'cricket' },
-        status: { $in: ['live', 'scheduled'] },
-        end_time: { $lt: now }
-      },
-      { $set: { status: 'completed', updatedAt: new Date() } }
-    );
-
-    console.log(
-      '[settle] non-cricket expired → matched:',
-      otherRes.matchedCount ?? otherRes.n,
-      ' modified:',
-      otherRes.modifiedCount ?? otherRes.nModified
-    );
-  } catch (e) {
-    console.error('[settle] error:', e.message);
+  const sports = ['cricket', 'tennis']
+  let completed = [];
+  for (const sport of sports) {
+    completed = await withTimeout(fetchCompletedMatchesBySport(sport), 20_000, `completed:${sport}`);
+    await settleSportMatches(sport, completed);
   }
 }
 

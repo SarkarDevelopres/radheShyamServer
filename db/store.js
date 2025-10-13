@@ -90,9 +90,16 @@ async function lockBetsForRound(roundId) {
 
 async function fetchBalance(userId) {
   // console.log("USERID: ", userId);
-  console.log(userId);
+  // console.log(userId);
 
   const u = await User.findById(userId).select("balance");
+  return u;
+}
+async function fetchExp(userId) {
+  // console.log("USERID: ", userId);
+  // console.log(userId);
+
+  const u = await User.findById(userId).select("exp");
   return u;
 }
 // ---------- casino bet placement (socket flow) ----------
@@ -107,7 +114,7 @@ async function placeBetTx({ userId, game, tableId, roundId, market, stake }) {
 
     const u = await User.findOneAndUpdate(
       { _id: userId, balance: { $gte: stake } },
-      { $inc: { balance: -stake } },
+      { $inc: { balance: -stake, exp:-stake } },
       { new: true, session }
     );
     if (!u) throw new Error('INSUFFICIENT_FUNDS');
@@ -176,7 +183,7 @@ async function placeSportsBetTx({ userId, eventId, market, selection, selectionN
   try {
     const u = await User.findOneAndUpdate(
       { _id: userId, balance: { $gte: deductAmount } },
-      { $inc: { balance: -deductAmount } },
+      { $inc: { balance: -deductAmount, exp:-deductAmount } },
       { new: true, session }
     );
     if (!u) throw new Error('INSUFFICIENT_FUNDS');
@@ -291,7 +298,7 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
           walletIncs.push({
             updateOne: {
               filter: { _id: b.userId },
-              update: { $inc: { balance: Number(payout) } },
+              update: { $inc: { balance: Number(payout), exp: Number(payout)} },
             },
           });
           txDocs.push({
@@ -345,7 +352,7 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
           walletIncs.push({
             updateOne: {
               filter: { _id: b.userId },
-              update: { $inc: { balance: Number(payout) } },
+              update: { $inc: { balance: Number(payout), exp: Number(payout)} },
             },
           });
           txDocs.push({
@@ -394,7 +401,7 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
           walletIncs.push({
             updateOne: {
               filter: { _id: b.userId },
-              update: { $inc: { balance: Number(payout) } },
+              update: { $inc: { balance: Number(payout), exp: Number(payout)} },
             },
           });
           txDocs.push({
@@ -455,7 +462,7 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
           walletIncs.push({
             updateOne: {
               filter: { _id: b.userId },
-              update: { $inc: { balance: Number(payout) } },
+              update: { $inc: { balance: Number(payout), exp: Number(payout)} },
             },
           });
           txDocs.push({
@@ -520,6 +527,7 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
 
 module.exports = {
   fetchBalance,
+  fetchExp,
   createRound,
   lockRound,
   placeBetTx,        // casino

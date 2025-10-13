@@ -27,60 +27,6 @@ function isNewer(prev, next) {
   return true;
 }
 
-function summarize(msg) {
-  const r = msg?.response || msg?.data || msg;
-  const i = r?.match_info || msg?.match_info || {};
-  const innings = r?.scorecard?.innings || [];
-
-  return {
-    matchId: getMatchId(msg),
-    title: i.title || r?.title,
-    status: i.status_str || r?.match_status || r?.status_str,
-    ball_event: r?.ball_event || r?.event,
-    over: r?.data?.over || r?.over || r?.overs,
-    ball: r?.data?.ball || r?.ball,
-    striker: r?.data?.striker_name,
-    bowler: r?.data?.bowler_name,
-    teamA: i?.teama?.short_name,
-    teamB: i?.teamb?.short_name,
-    odds: r?.live_odds?.matchodds ? {
-      A: r.live_odds.matchodds.teama?.back ?? null,
-      B: r.live_odds.matchodds.teamb?.back ?? null
-    } : undefined,
-    innings: innings.map(inn => ({
-      number: inn.number,
-      short: inn.short_name,
-      score: inn.scores,
-    })),
-  };
-}
-
-function normalizeSnapshot(raw) {
-  const r = raw?.response || {};
-  const i = r?.match_info || {};
-  const A = i?.teama || {};
-  const B = i?.teamb || {};
-  const odds = raw?.response?.live_odds?.matchodds || {};
-
-  return {
-    matchId: r?.match_id ?? i?.match_id,
-    title: i?.title || i?.short_title,
-    teamA: {
-      short: A?.short_name || A?.name,
-      scores: A?.scores || "-",
-      overs: A?.overs || "-"
-    },
-    teamB: {
-      short: B?.short_name || B?.name,
-      scores: B?.scores || "-",
-      overs: B?.overs || "-"
-    },
-    live_odds: {
-      teama: odds?.teama || {},
-      teamb: odds?.teamb || {}
-    }
-  };
-}
 
 /**
  * connectEntity(onUpdate)
@@ -120,6 +66,8 @@ function connectEntity(onUpdate) {
       let msg;
       try {
         msg = JSON.parse(buf.toString());
+        // console.log(msg);
+        
       } catch {
         if (DEBUG) console.log('[entity] non-JSON frame:', String(buf).slice(0, 120));
         return;
