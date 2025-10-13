@@ -182,6 +182,7 @@ function buildTennisSessionOdds(matchOdds, teama, teamb) {
 // ---- Provider calls ----
 async function fetchMatchesFromProvider(sport) {
   if (sport === 'cricket') {
+
     const scheduledUrl = `https://restapi.entitysport.com/exchange/matches/?status=1&token=${process.env.ENTITY_TOKEN}`;
     const liveUrl = `https://restapi.entitysport.com/exchange/matches/?status=3&token=${process.env.ENTITY_TOKEN}`;
     const [data, liveData] = await Promise.all([fetch(scheduledUrl), fetch(liveUrl)]);
@@ -250,7 +251,7 @@ async function fetchMatchesFromProvider(sport) {
       const event_date = it.event_date;
       const event_time = it.event_time; // assuming the API gives this separately
 
-      const start = new Date(`${event_date}T${event_time}:00+05:30`); // IST
+      const start = new Date(`${event_date}T${event_time}:00`); // IST
       const start_time = start.getTime(); // ms
       const start_time_ist = start.toLocaleString("en-GB", {
         day: "2-digit",
