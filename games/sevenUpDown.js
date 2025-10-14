@@ -24,8 +24,8 @@ function cardToOutcome(card) {
   else if (rank === "K") rankValue = 13;
   else rankValue = parseInt(rank);
 
-  if (rankValue === 7){ seven = true; firstOutcome = "SEVEN"}
-  else if (rankValue < 7){ low = true; firstOutcome = "DOWN"}
+  if (rankValue === 7) { seven = true; firstOutcome = "SEVEN" }
+  else if (rankValue < 7) { low = true; firstOutcome = "DOWN" }
   else high = true;
 
   const group = (card.suit === "hearts" || card.suit === "diamonds") ? "red" : "black";
@@ -109,18 +109,28 @@ function initSevenUpDown(io, tableId = 'table-1') {
       onLock: async (roundId) => {
         await lockRound(roundId);
         const result = await biasedDice(roundId);
-         engine._preResults.set(roundId, result);
+        engine._preResults.set(roundId, result);
       },
 
       // Biased RNG is computed here
       onComputeResult: (roundId) => {
         const res = engine._preResults.get(roundId);
-        
-        if (!res) return null;
+        // console.log("Res before: ", res);
+        if (!res) {
+          console.warn(`[${roundId}] No cached result found — using fallback random card`);
+          const deck = makeDeck();
+          const card = deck[Math.floor(Math.random() * deck.length)];
+          res = cardToOutcome(card);
+          engine._preResults.set(roundId, res); // store for consistency
+        }
+
+        // console.log("Res before:", res);
         return res;
       },
 
       onSettle: async (roundId, result) => {
+        // console.log("Res:", result);
+
         const { firstOutcome, group, suit, card } = result;
         await settleRoundTx({
           roundId,

@@ -61,7 +61,9 @@ function attachSocket(server) {
       
       const room = `live:match:${matchId}`;
       socket.join(room);
-      let data = getMatch(matchId)      
+      let data = getMatch(matchId);
+      console.log("Match Joined: ",data);
+            
       socket.emit('watch:joined', { data });
     });
 

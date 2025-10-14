@@ -29,8 +29,6 @@ function connectTennis(onUpdate) {
           watchList.includes(String(match.event_key))
         );
 
-        // console.log(filteredMatches);
-
         for (const match of filteredMatches) {
 
           const matchData = {
@@ -49,6 +47,8 @@ function connectTennis(onUpdate) {
             points: match.pointbypoint || [],
             sets: match.scores || []
           };
+
+          setMatch(match.event_key,{data:matchData});
 
           if (match.event_status == "Finished") {
             remove(match.event_key);

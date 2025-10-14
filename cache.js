@@ -7,7 +7,8 @@ const cache = new Map();
  * @param {object} data 
  */
 function setMatch(matchId, data) {
-    
+    // console.log(`Match Added: ${matchId} `,data);
+        
     cache.set(String(matchId), { data, updated: Date.now() });
 }
 
