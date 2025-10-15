@@ -23,17 +23,20 @@ export function cashoutLay({ layStake, layOddsPlaced, currentBackOdds, fee = 0.1
   if (layStake <= 0 || layOddsPlaced <= 1 || currentBackOdds <= 1 || fraction <= 0) {
     return { held: 0, payoutNow: 0, profitNow: 0 };
   }
+
   const L = layStake * fraction;
   const liability = (layOddsPlaced - 1) * L;
-  const backStake = liability / (currentBackOdds - 1); // hedge needed now
-  const profit = L - backStake;                        // can be negative
+  const backStake = liability / (currentBackOdds - 1);
+  const profit = backStake - L; // ✅ correct direction
   const profitAfterFee = profit * (1 - fee);
+
   return {
     held: liability,
-    payoutNow: liability + layStake + profitAfterFee,             // release liability + net profit/loss
+    payoutNow: liability + profitAfterFee, // ✅ no extra layStake
     profitNow: profitAfterFee,
   };
 }
+
 
 // oddsBook: { [selection: string]: { back: number, lay: number } }
 export function cashoutForBet(bet, oddsBook, { fee = 0.15, fraction = 1 } = {}) {

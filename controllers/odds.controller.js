@@ -18,8 +18,8 @@ const handleSport = async (req, res, sport) => {
     for (const o of odds) {
       oddsMap.set(String(o.matchId), { odds: o.odds }); // o.odds should already be an array
     }
-    //  console.log("Matchs: ", matchs);
-    //  console.log("Odds: ", odds);
+    //  console.log("Matchs: ", matchs[0]);
+    //  console.log("Odds: ", odds[0]);
 
     const view = matchs
       .map(m => {
@@ -32,7 +32,8 @@ const handleSport = async (req, res, sport) => {
           start_time: m.start_time_ist,
           status: m.status,
           matchId: m.matchId,
-          odds: o.odds
+          odds: o.odds,
+          game_state: m.game_state
         };
       })
       .filter(Boolean) // remove nulls
@@ -42,6 +43,9 @@ const handleSport = async (req, res, sport) => {
         if (a.status !== "live" && b.status === "live") return 1;
         return 0; // keep relative order otherwise
       });
+
+      // console.log("Odds List: ",view[0]);
+      
 
     return res.json({ success: true, data: view });
   } catch (err) {

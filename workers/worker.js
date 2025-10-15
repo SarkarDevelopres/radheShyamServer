@@ -244,7 +244,7 @@ async function fetchMatchesFromProvider(sport) {
       )
       : [];
 
-    // console.log("Tennis Raw Data:", filtered);
+    // console.log("Tennis Raw Data:", filtered[0]);
 
     for (it of filtered) {
 
@@ -298,10 +298,32 @@ async function fetchMatchesFromProvider(sport) {
         game_state_string = "Suspended";
       }
 
-      const game_state = {
-        code: game_state_code,
-        string: game_state_string,
-      };
+      let liveScore = {
+        serve: it.event_serve,
+        score: it.event_game_result,
+        stats: it.statistics,
+        final: it.event_final_result,
+        status: it.event_status,
+        winner: it.event_winner,
+        live: it.event_live === "1",
+        points: it.pointbypoint || [],
+        sets: it.scores || []
+      }
+      let game_state = {};
+      if (it.event_status.toLowerCase().includes("set") || it.event_live === "1") {
+        game_state = {
+          code: game_state_code,
+          string: game_state_string,
+          live_score: liveScore
+        };
+      } else {
+        game_state = {
+          code: game_state_code,
+          string: game_state_string,
+        };
+      }
+
+
       matchList.push({
         matchId: String(it.event_key),
         sport: 'tennis',
@@ -528,12 +550,12 @@ async function fetchCompletedCricketIds() {
     .filter(it => Boolean(it.matchId));
 }
 
-async function fetchCompletedFootballIds(){
+async function fetchCompletedFootballIds() {
   try {
     return [];
   } catch (error) {
     console.log(error);
-    
+
   }
 }
 
@@ -719,7 +741,7 @@ async function runFetchAndMaterialize() {
   for (const sport of SPORTS) {
     try {
       console.log(`[worker] → ${sport}: fetching fixtures`);
-      const matches = await withTimeout(fetchMatchesFromProvider(sport), 25_000, `fixtures:${sport}`);
+      const matches = await withTimeout(fetchMatchesFromProvider(sport), 60_000, `fixtures:${sport}`);
 
       // upsert matches
       if (matches.length) {
@@ -751,7 +773,7 @@ async function runFetchAndMaterialize() {
 
       if (ids.length) {
         // console.log(`[worker] → ${sport}: fetching odds for ${ids.length}`);
-        const oddDocs = await withTimeout(fetchOddsBatch(sport, ids, globalNameById), 25_000, `odds:${sport}`);
+        const oddDocs = await withTimeout(fetchOddsBatch(sport, ids, globalNameById), 60_000, `odds:${sport}`);
 
         if (oddDocs.length) {
 
@@ -796,29 +818,16 @@ async function runFetchAndMaterialize() {
 
   console.log(`[worker] ✓ refresh done in ${Date.now() - started}ms  matches:${totalMatches} odds:${totalOdds}`);
 }
-// const io = getIO();
-// testWin("68ada5984140021fe4bd57a0")
-// 1) Fetch provider’s completed matches (with winners)
 
-
-// io.to(`user:${b.userId}`).emit("wallet:update", {
-//   ok: true,
-//   balance: b.userBalance + payout,  // or fetch latest balance
-//   amount: payout,
-//   type: "bet_win",
-//   betId: b._id,
-//   eventId: matchId
-// });
 
 async function runSettlement() {
   const sports = ['cricket', 'tennis']
   let completed = [];
   for (const sport of sports) {
-    completed = await withTimeout(fetchCompletedMatchesBySport(sport), 20_000, `completed:${sport}`);
+    completed = await withTimeout(fetchCompletedMatchesBySport(sport), 100_000, `completed:${sport}`);
     await settleSportMatches(sport, completed);
   }
 }
-
 
 
 // ---- Boot once, schedule jobs ----
