@@ -29,4 +29,8 @@ router.post('/findSingleUser', AdminController.findUser);
 router.post('/createEmp', AdminController.createEmp);
 router.post('/deleteEmp', AdminController.deleteEmp);
 
+// CONFIG APIS
+router.post('/changeSlides',AdminController.changeSlides);
+router.get('/fetchSlides',AdminController.fetchSlides);
+
 module.exports = router;

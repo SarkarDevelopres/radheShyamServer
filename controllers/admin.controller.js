@@ -7,7 +7,7 @@ const Employee = require('../db/models/employee');
 const Admin = require('../db/models/admin');
 const Odds = require('../db/models/odds');
 const Transaction = require('../db/models/transaction');
-const admin = require('../db/models/admin');
+const Config = require('../db/models/config');
 // const bcrypt = require("bcryptjs");
 
 
@@ -894,5 +894,51 @@ exports.setMaintainance = async (req, res) => {
         return res.status(400).json({ ok: false, message: "Error changing maintainnce" });
     } catch (error) {
         return res.status(500).json({ ok: false, message: "Error changing maintainnce" });
+    }
+}
+
+
+exports.changeSlides = async (req, res) => {
+    try {
+        const authHeader = req.headers["authorization"];
+        if (!authHeader) {
+            return res.status(401).json({ ok: false, message: "No token provided" });
+        }
+
+        // Format: "Bearer <token>"
+        const token = authHeader.split(" ")[1];
+        if (!token) {
+            return res.status(401).json({ ok: false, message: "Invalid token format" });
+        }
+
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const adminId = decoded.adminID;
+
+        if (!adminId) {
+            return res.status(401).json({ ok: false, message: "Unauthorized" });
+        }
+        const { slidePathArray } = req.body;
+        const updated = await Config.updateOne(
+            { _id: "server_config_89263" },
+            { $set: { slides: slidePathArray } },
+            { upsert: true }
+        );
+
+        return res.status(200).json({ ok: true, message: "Slides updated" });
+
+    } catch (error) {
+        console.error("Error in changeSlides:", error.message);
+        return res.status(500).json({ ok: false, message: "Server error", error: error.message });
+    }
+}
+
+exports.fetchSlides = async (req, res) => {
+    try {
+        let slidesPathArray = await Config.findById("server_config_89263");
+        return res.status(200).json({ ok: true, data: slidesPathArray });
+    } catch (error) {
+        console.error("Error in fetch slides:", error.message);
+        return res.status(500).json({ ok: false, message: "Server error", error: error.message });
     }
 }
