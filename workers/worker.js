@@ -563,17 +563,20 @@ async function fetchCompletedTennisIds() {
   let dateNow = new Date();
   let today = dateNow.toISOString().split('T')[0];
 
+  dateNow.setDate(dateNow.getDate() - 1); // move back by one day
+  let yesterday = dateNow.toISOString().split('T')[0];
+
   const nextWeek = new Date(dateNow); // clone dateNow, not today string
   nextWeek.setDate(dateNow.getDate() + 7);
   const nextWeekDate = nextWeek.toISOString().split('T')[0];
 
-  const apiTennisUrl = `https://api.api-tennis.com/tennis/?method=get_fixtures&APIkey=${process.env.API_TENNIS_KEY}&date_start=${today}&date_stop=${nextWeekDate}&timezone=Asia/Kolkata`;
+  const apiTennisUrl = `https://api.api-tennis.com/tennis/?method=get_fixtures&APIkey=${process.env.API_TENNIS_KEY}&date_start=${yesterday}&date_stop=${nextWeekDate}&timezone=Asia/Kolkata`;
 
   const res = await fetch(apiTennisUrl);
   const data = await res.json();
   const result = data.result || [];
 
-  return result.filter(it => it.event_status === 'Finished')
+  return result.filter(it => it.event_status === 'Finished' || it.event_status === 'Retired')
     .map(it => ({
       matchId: String(it.event_key),
       winningTeamId: String(it.event_winner)
@@ -824,7 +827,7 @@ async function runSettlement() {
   const sports = ['cricket', 'tennis']
   let completed = [];
   for (const sport of sports) {
-    completed = await withTimeout(fetchCompletedMatchesBySport(sport), 100_000, `completed:${sport}`);
+    completed = await withTimeout(fetchCompletedMatchesBySport(sport), 1000_000, `completed:${sport}`);
     await settleSportMatches(sport, completed);
   }
 }
