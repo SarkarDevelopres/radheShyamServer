@@ -67,7 +67,7 @@ function connectEntity(onUpdate) {
       try {
         msg = JSON.parse(buf.toString());
         // console.log(msg);
-        
+
       } catch {
         if (DEBUG) console.log('[entity] non-JSON frame:', String(buf).slice(0, 120));
         return;
@@ -115,11 +115,21 @@ function connectEntity(onUpdate) {
 
 
         onUpdate(matchId, { kind: 'snapshot', data: data });
-        if (liveStatus == "Match Completed" || liveStatus == "Match completed") {
-          await Matchs.updateOne(
+
+        if (gameState != 3) {
+          
+          if (liveStatus == "Match Completed" || liveStatus == "Match completed") {
+            await Matchs.updateOne(
+              { matchId },
+              { $set: { game_state: { code: 4, string: 'Match Completed wait for 30mins for bets' }, updatedAt: new Date() } }
+            );
+          }
+          else{
+            await Matchs.updateOne(
             { matchId },
-            { $set: { game_state: { code: 4, string: 'Match Completed wait for 30mins for bets' }, updatedAt: new Date() } }
+            { $set: { game_state: { code: gameState, string: gameStateStr }, updatedAt: new Date() } }
           );
+          }
         }
 
       } else if (msg?.response?.ball_event || msg?.response?.data?.over) {
