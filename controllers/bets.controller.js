@@ -63,7 +63,7 @@ exports.placeBets = async (req, res) => {
 
       if (betPlacedData.ok) {
 
-        if (findCashOut.profitHeld>0) {
+        if (findCashOut.profitHeld > 0) {
           await findCashOut.save();
         } else {
           findCashOut.status = "SETTLED";
@@ -115,8 +115,15 @@ exports.takeBet = async (req, res) => {
     let user = await User.findById(userId);
 
     if (!user) throw new Error("User not found");
- 
-    user.balance += result.payoutNow;
+
+    if (result.profitNow > 1) {
+      user.balance += result.held;
+    } else {
+      // let finalPayOut= (result.held-result.profitNow);
+      if (result.payoutNow>0) {
+        user.balance += result.payoutNow;
+      }
+    }
 
     await user.save();
     // 4. Mark bets as cashed out
