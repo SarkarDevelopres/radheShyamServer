@@ -119,7 +119,6 @@ exports.takeBet = async (req, res) => {
     if (result.profitNow > 1) {
       user.balance += result.held;
     } else {
-      // let finalPayOut= (result.held-result.profitNow);
       if (result.payoutNow>0) {
         user.balance += result.payoutNow;
       }
