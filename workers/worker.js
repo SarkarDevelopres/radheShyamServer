@@ -19,7 +19,7 @@ const memCache = new Map();
 
 // ---- Constants ----
 const MIN = 60 * 1000;
-const SPORTS = ['cricket', 'soccer', 'tennis', 'basketball_nba', 'baseball'];
+const SPORTS = ['cricket', 'tennis'];
 // const SPORTS = ['tennis'];
 
 const DURATIONS = {
@@ -570,13 +570,13 @@ async function fetchCompletedTennisIds() {
   nextWeek.setDate(dateNow.getDate() + 7);
   const nextWeekDate = nextWeek.toISOString().split('T')[0];
 
-  const apiTennisUrl = `https://api.api-tennis.com/tennis/?method=get_fixtures&APIkey=${process.env.API_TENNIS_KEY}&date_start=${yesterday}&date_stop=${nextWeekDate}&timezone=Asia/Kolkata`;
+  const apiTennisUrl = `https://api.api-tennis.com/tennis/?method=get_fixtures&APIkey=${process.env.API_TENNIS_KEY}&date_start=${yesterday}&date_stop=${today}&timezone=Asia/Kolkata`;
 
   const res = await fetch(apiTennisUrl);
   const data = await res.json();
   const result = data.result || [];
-
-  return result.filter(it => it.event_status === 'Finished' || it.event_status === 'Retired')
+// Walk Over Cancelled
+  return result.filter(it => it.event_status === 'Finished' || it.event_status === 'Retired' || it.event_status === 'Walk Over' || it.event_status === 'Cancelled')
     .map(it => ({
       matchId: String(it.event_key),
       winningTeamId: String(it.event_winner)
@@ -848,7 +848,7 @@ async function runSettlement() {
     // schedule periodic jobs (add small jitter to avoid exact-minute stampedes)
     const jitter = () => 500 + Math.floor(Math.random() * 1500);
     setInterval(runFetchAndMaterialize, 5 * MIN + jitter());
-    setInterval(runSettlement, 15 * 1000 + jitter());
+    setInterval(runSettlement, 1 * 1000 + jitter());
   } catch (err) {
     console.error('[db] connection failed:', err.message);
     process.exit(1);
