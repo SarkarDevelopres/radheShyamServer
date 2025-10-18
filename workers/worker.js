@@ -848,7 +848,7 @@ async function runSettlement() {
     // schedule periodic jobs (add small jitter to avoid exact-minute stampedes)
     const jitter = () => 500 + Math.floor(Math.random() * 1500);
     setInterval(runFetchAndMaterialize, 5 * MIN + jitter());
-    setInterval(runSettlement, 1 * 1000 + jitter());
+    setInterval(runSettlement, 15 * MIN + jitter());
   } catch (err) {
     console.error('[db] connection failed:', err.message);
     process.exit(1);
