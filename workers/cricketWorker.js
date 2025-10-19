@@ -236,6 +236,7 @@ async function settleSportMatches(sport, completed) {
                     $set: {
                         game_state: { code: status ==="cancelled" ?  4 : 2, string: status ==="cancelled" ? "cancelled" : "completed"},
                         status: status === "cancelled" ? "cancelled" : "completed",
+                        winner:winningTeamId,
                         updatedAt: new Date()
                     }
                 }

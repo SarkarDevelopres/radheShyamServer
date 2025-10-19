@@ -407,6 +407,7 @@ async function fetchCompletedTennisIds() {
         .map(it => ({
             matchId: String(it.event_key),
             winningTeamId: it.event_winner ? String(it.event_winner) : null,
+            status:it.event_status,
         }))
         .filter(it => Boolean(it.matchId));
 }
@@ -416,21 +417,20 @@ async function settleSportMatches(sport, completed) {
 
     try {
         if (completed.length) {
-            // Update match status → completed
-            const ids = completed.map(m => m.matchId);
-            const res = await Matchs.updateMany(
-                { sport: `${sport}`, matchId: { $in: ids }, status: { $ne: 'completed' } },
-                { $set: { status: 'completed', updatedAt: new Date() } }
-            );
-            console.log(
-                `[settle] ${sport} completed → matched:`,
-                res.matchedCount ?? res.n,
-                ' modified:',
-                res.modifiedCount ?? res.nModified
-            );
-
+            
             // ---- NEW: settle sports bets ----
-            for (const { matchId, winningTeamId } of completed) {
+            for (const { matchId, winningTeamId, status } of completed) {
+                await Matchs.updateOne(
+                    { sport, matchId },
+                    {
+                        $set: {
+                            game_state: { code: status === "Cancelled" ? 2 : 4, string: status === "Cancelled" ? "cancelled" : "completed" },
+                            status: status === "Cancelled" ? "cancelled" : "completed",
+                            winner: winningTeamId,
+                            updatedAt: new Date()
+                        }
+                    }
+                );
                 if (!winningTeamId) continue;
                 if (!winningTeamId || winningTeamId === 'null' || winningTeamId === '-') continue;
 
@@ -455,11 +455,11 @@ async function settleSportMatches(sport, completed) {
                             }
                         });
 
-                        if ( b.profitHeld > 0) {
+                        if (b.profitHeld > 0) {
                             bulkUsers.push({
                                 updateOne: {
                                     filter: { _id: b.userId },
-                                    update: { $inc: { balance:  b.profitHeld } }
+                                    update: { $inc: { balance: b.profitHeld } }
                                 }
                             });
                             txs.push({

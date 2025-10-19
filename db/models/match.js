@@ -1,7 +1,7 @@
 // db/models/match.js
 const mongoose = require('mongoose');
 const MatchScehma = new mongoose.Schema({
-    matchId:  { type: String, required: true },
+    matchId: { type: String, required: true },
     teamHome: { type: Object, required: true },
     teamAway: { type: Object, required: true },
     title: { type: String },
@@ -14,7 +14,8 @@ const MatchScehma = new mongoose.Schema({
     game_state: { type: Object },
     isOdds: { type: Boolean },
     sport: { type: String },
-    sportsKey: {type: String},
+    sportsKey: { type: String },
+    winner: { type: String, default:"none" },
 })
 module.exports = mongoose.model('Matchs', MatchScehma);
-  
+

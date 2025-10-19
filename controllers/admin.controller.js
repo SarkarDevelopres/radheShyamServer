@@ -6,7 +6,9 @@ const User = require('../db/models/user');
 const Employee = require('../db/models/employee');
 const Admin = require('../db/models/admin');
 const Odds = require('../db/models/odds');
+const Matchs = require('../db/models/match');
 const Transaction = require('../db/models/transaction');
+const Bets = require('../db/models/bet');
 const Config = require('../db/models/config');
 // const bcrypt = require("bcryptjs");
 
@@ -940,6 +942,94 @@ exports.fetchSlides = async (req, res) => {
         return res.status(200).json({ ok: true, data: slidesPathArray });
     } catch (error) {
         console.error("Error in fetch slides:", error.message);
+        return res.status(500).json({ ok: false, message: "Server error", error: error.message });
+    }
+}
+
+exports.casinoBetsLogs = async (req, res) => {
+    try {
+        const casinoBetsList = await Bets.find({ type: "casino" })
+            .select("market game stake userId status createdAt")
+            .sort({ createdAt: -1 })
+            .limit(500);
+
+        const userIds = [...new Set(casinoBetsList.map(b => b.userId.toString()))];
+        const users = await User.find({ _id: { $in: userIds } }).select("username");
+        const userMap = Object.fromEntries(users.map(u => [u._id.toString(), u.username]));
+
+        const merged = casinoBetsList.map(b => ({
+            ...b.toObject(),
+            username: userMap[b.userId.toString()] || "Unknown",
+        }));
+
+        // console.log(merged);
+
+        return res.status(200).json({ ok: true, data: merged });
+
+    } catch (error) {
+        console.error("Error in fetch bets:", error.message);
+        return res.status(500).json({ ok: false, message: "Server error", error: error.message });
+    }
+}
+exports.sportBetsLogs = async (req, res) => {
+    try {
+        const sportsBetsList = await Bets.find({ type: "sports" })
+            .select("selectionName odds stake userId status lay createdAt")
+            .sort({ createdAt: -1 })
+            .limit(500);
+
+        const userIds = [...new Set(sportsBetsList.map(b => b.userId.toString()))];
+        const users = await User.find({ _id: { $in: userIds } }).select("username");
+        const userMap = Object.fromEntries(users.map(u => [u._id.toString(), u.username]));
+
+        const merged = sportsBetsList.map(b => ({
+            ...b.toObject(),
+            username: userMap[b.userId.toString()] || "Unknown",
+        }));
+
+        // console.log(merged);
+
+        return res.status(200).json({ ok: true, data: merged });
+
+    } catch (error) {
+        console.error("Error in fetch bets:", error.message);
+        return res.status(500).json({ ok: false, message: "Server error", error: error.message });
+    }
+}
+exports.matchList = async (req, res) => {
+    try {
+        const matchListRaw = await Matchs.find()
+            .select("teamHome teamAway sport idOdds winner status start_time_ist")
+            .sort({ createdAt: -1 })
+            .limit(500)
+            .lean();
+
+        const matchList = matchListRaw.map(m => {
+            const homeName = m.teamHome?.name || "Unknown";
+            const awayName = m.teamAway?.name || "Unknown";
+
+            let winnerName = "Unknown";
+            if (m.winner && m.teamHome?.team_id === m.winner) {
+                winnerName = homeName;
+            } else if (m.winner && m.teamAway?.team_id === m.winner) {
+                winnerName = awayName;
+            }
+
+            return {
+                _id: m._id,
+                sport: m.sport,
+                teamHome: homeName,
+                teamAway: awayName,
+                winner: winnerName,
+                status: m.status,
+                createdAt: m.start_time_ist,
+            };
+        });
+
+        return res.status(200).json({ ok: true, data: matchList });
+
+    } catch (error) {
+        console.error("Error in fetch bets:", error.message);
         return res.status(500).json({ ok: false, message: "Server error", error: error.message });
     }
 }

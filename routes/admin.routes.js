@@ -33,4 +33,9 @@ router.post('/deleteEmp', AdminController.deleteEmp);
 router.post('/changeSlides',AdminController.changeSlides);
 router.get('/fetchSlides',AdminController.fetchSlides);
 
+// LOGS APIS
+router.get('/casinoBetsLogs',AdminController.casinoBetsLogs);
+router.get('/sportBetsLogs',AdminController.sportBetsLogs);
+router.get('/matchList',AdminController.matchList);
+
 module.exports = router;
