@@ -642,7 +642,7 @@ async function settleSportMatches(sport, completed) {
               bulkUsers.push({
                 updateOne: {
                   filter: { _id: b.userId },
-                  update: { $inc: { balance: b.stake } }
+                  update: { $inc: { balance: b.profit } }
                 }
               });
               txs.push({

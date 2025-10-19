@@ -81,8 +81,8 @@ async function main() {
   // connectEntityInspector();
 
 
-  const path = require('path');
-  startWorker(path.resolve(__dirname, 'workers/worker.js'));
+  // const path = require('path');
+  // startWorker(path.resolve(__dirname, 'workers/worker.js'));
 
   // 2) Only then start HTTP & sockets (which start the game engines)
   const server = http.createServer(app);

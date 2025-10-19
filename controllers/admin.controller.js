@@ -846,6 +846,7 @@ exports.checkMaintainance = async (req, res) => {
                     duration: getAdminData.maintenance.duration,
                     startedAt: getAdminData.maintenance.startedAt,
                     string: getAdminData.maintenance.string,
+                    heading: getAdminData.maintenance.heading,
                 })
             }
             return res.status(200).json({ ok: true, isMaintenance: false })
@@ -877,15 +878,15 @@ exports.setMaintainance = async (req, res) => {
         if (!adminId) {
             return res.status(401).json({ ok: false, message: "Unauthorized" });
         }
-        const { isOn, duration, string } = req.body;
-        console.log("Initial Data:", req.body);
+        const { isOn, duration, string, heading } = req.body;
+        // console.log("Initial Data:", req.body);
 
         let currentDate = new Date();
         let startedAt = currentDate.toISOString();
 
-        let newMaintainceData = await Admin.findOneAndUpdate({ role: "admin" }, { maintenance: { isOn, duration, string, startedAt } }, { new: true }).select("maintenance");
+        let newMaintainceData = await Admin.findOneAndUpdate({ role: "admin" }, { maintenance: { isOn, duration, string, heading, startedAt } }, { new: true }).select("maintenance");
 
-        console.log(newMaintainceData);
+        // console.log(newMaintainceData);
 
 
         if (newMaintainceData) {

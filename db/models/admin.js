@@ -25,9 +25,10 @@ const AdminSchema = new mongoose.Schema({
     },
     maintenance: {
         isOn: { type: Boolean, default: false },
-        string: {type: String},
-        duration: {type: String},
-        startedAt: {type: Date},
+        heading: { type: String },
+        string: { type: String },
+        duration: { type: String },
+        startedAt: { type: Date },
     },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
