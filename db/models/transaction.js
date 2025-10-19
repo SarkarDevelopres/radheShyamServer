@@ -6,7 +6,7 @@ const TransactionSchema = new mongoose.Schema({
   // Append-only money movement type
   type: { 
     type: String,
-    enum: ['deposit','withdraw','bet_place','bet_void_refund','payout_win'],
+    enum: ['deposit','withdraw','bet_place','bet_void_refund','payout_win','cashout_win'],
     index: true,
     required: true
   },

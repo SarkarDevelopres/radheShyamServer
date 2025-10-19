@@ -234,6 +234,7 @@ async function settleSportMatches(sport, completed) {
                 { sport, matchId },
                 {
                     $set: {
+                        game_state: { code: status ==="cancelled" ?  4 : 2, string: status ==="cancelled" ? "cancelled" : "completed"},
                         status: status === "cancelled" ? "cancelled" : "completed",
                         updatedAt: new Date()
                     }
@@ -311,17 +312,17 @@ async function settleSportMatches(sport, completed) {
                         }
                     });
 
-                    if (b.stake > 0) {
+                    if (b.profitHeld > 0) {
                         bulkUsers.push({
                             updateOne: {
                                 filter: { _id: b.userId },
-                                update: { $inc: { balance: b.stake } }
+                                update: { $inc: { balance: b.profitHeld } }
                             }
                         });
                         txs.push({
                             userId: b.userId,
                             type: "cashout_win",
-                            amount: b.stake,
+                            amount: b.profitHeld,
                             meta: { betId: b._id, eventId: matchId }
                         });
                     }
@@ -474,7 +475,7 @@ async function runSettlement() {
     try {
         let completed = await withTimeout(fetchCompletedCricketIds(), 60_000, `completed: cricket`);
         await settleSportMatches("cricket", completed);
-        console.log('[runSettlement] completed IDs:', completed.length);
+        // console.log('[runSettlement] completed IDs:', completed);
     }
     catch {
         console.error('[runSettlement] cricket error:', e);
@@ -492,12 +493,13 @@ async function runSettlement() {
         console.log('[db] connected');
 
         // run once at startup
-        await runFetchAndMaterialize();
+        // await runFetchAndMaterialize();
+        await runSettlement();
 
         // schedule periodic jobs (add small jitter to avoid exact-minute stampedes)
         const jitter = () => 500 + Math.floor(Math.random() * 1500);
-        setInterval(runFetchAndMaterialize, 5 * MIN + jitter());
-        setInterval(runSettlement, 8 * MIN + jitter());
+        // setInterval(runFetchAndMaterialize, 5 * MIN + jitter());
+        // setInterval(runSettlement, 2* MIN + jitter());
     } catch (err) {
         console.error('[db] connection failed:', err.message);
         process.exit(1);

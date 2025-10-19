@@ -455,17 +455,17 @@ async function settleSportMatches(sport, completed) {
                             }
                         });
 
-                        if (b.profitHeld > 0) {
+                        if ( b.profitHeld > 0) {
                             bulkUsers.push({
                                 updateOne: {
                                     filter: { _id: b.userId },
-                                    update: { $inc: { balance: b.profit } }
+                                    update: { $inc: { balance:  b.profitHeld } }
                                 }
                             });
                             txs.push({
                                 userId: b.userId,
                                 type: "cashout_win",
-                                amount: b.stake,
+                                amount: b.profitHeld,
                                 meta: { betId: b._id, eventId: matchId }
                             });
                         }

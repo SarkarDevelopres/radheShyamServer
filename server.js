@@ -50,6 +50,7 @@ const betsRouter = require('./routes/bets.routes');
 const adminRouter = require('./routes/admin.routes');
 const employeeRouter = require('./routes/employee.routes');
 const userRouter = require('./routes/user.routes');
+const testRouter = require('./routes/test.routes');
 
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -62,6 +63,7 @@ app.use('/api/data', dataRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/emp', employeeRouter);
 app.use('/api/user', userRouter);
+app.use('/api/test', testRouter);
 
 // Protected routes
 app.use('/api/bets', authenticateUser, betsRouter);
