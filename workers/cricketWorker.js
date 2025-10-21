@@ -494,13 +494,13 @@ async function runSettlement() {
         console.log('[db] connected');
 
         // run once at startup
-        // await runFetchAndMaterialize();
-        await runSettlement();
+        await runFetchAndMaterialize();
+        // await runSettlement();
 
         // schedule periodic jobs (add small jitter to avoid exact-minute stampedes)
         const jitter = () => 500 + Math.floor(Math.random() * 1500);
-        // setInterval(runFetchAndMaterialize, 5 * MIN + jitter());
-        // setInterval(runSettlement, 2* MIN + jitter());
+        setInterval(runFetchAndMaterialize, 5 * MIN + jitter());
+        setInterval(runSettlement, 2* MIN + jitter());
     } catch (err) {
         console.error('[db] connection failed:', err.message);
         process.exit(1);
