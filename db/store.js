@@ -184,7 +184,7 @@ async function placeSportsBetTx({ userId, eventId, market, selection, selectionN
   session.startTransaction();
   try {
     const rawDeduct = Number(deductAmount);
-    if (isNaN(rawDeduct) || rawDeduct <= 0) {
+    if (isNaN(rawDeduct) || rawDeduct < 0) {
       console.error("❌ Invalid deductAmount received:", deductAmount);
       throw new Error(`Invalid deductAmount (${deductAmount})`);
     }

@@ -49,10 +49,18 @@ exports.placeBets = async (req, res) => {
 
     if (!findCashOut || !findCashOut.profitHeld || findCashOut.profitHeld <= 0) {
       console.log("No active cashout or profitHeld ≤ 0, placing normal bet");
-      let betPlacedData = await placeSportsBetTx({ userId, eventId: matchId, market, selection, selectionName, stake, odds, bookmakerKey, deductAmount,lay });
+      let betPlacedData = await placeSportsBetTx({ userId, eventId: matchId, market, selection, selectionName, stake, odds, bookmakerKey, deductAmount, lay });
       console.log("Bet placed data:", betPlacedData);
 
       if (betPlacedData.ok) {
+        await Bet.create({
+          type: "cashout",
+          stake: Number(stake),
+          eventId: matchId,
+          userId: userId,
+          profitHeld: 0,
+          status: "LOCKED",
+        })
         const io = getIO();
         const sockets = await io.fetchSockets();
         sockets.forEach(sock => {
@@ -70,6 +78,7 @@ exports.placeBets = async (req, res) => {
       // console.log("Existing cashout found:", findCashOut);
       const stakeNum = Number(stake);
       let profitHeld = Number(findCashOut.profitHeld || 0);
+      let constProfitRecord = Number(findCashOut.profitHeld || 0);
 
       if (isNaN(stakeNum) || isNaN(profitHeld)) {
         throw new Error(`Invalid numeric values: stake=${stake}, profitHeld=${findCashOut.profitHeld}`);
@@ -79,6 +88,7 @@ exports.placeBets = async (req, res) => {
         // Case 1: stake uses up all profitHeld, remaining from wallet
         deductAmount = stakeNum - profitHeld;
         profitHeld = 0;
+        
         console.log(`🟢 Stake (${stakeNum}) ≥ profitHeld (${findCashOut.profitHeld}) → deduct ${deductAmount}, profitHeld now 0`);
       } else {
         // Case 2: stake fully covered by profitHeld
@@ -89,21 +99,31 @@ exports.placeBets = async (req, res) => {
 
       // persist updated profitHeld
       // console.log(findCashOut);
-      
+
       findCashOut.profitHeld = profitHeld;
-      await findCashOut.save();
+      findCashOut.status = "SETTLED";
+      // await findCashOut.save();
       // console.log("Adjusted profitHeld:", findCashOut.profitHeld, "Deduct:", deductAmount);
 
-      let betPlacedData = await placeSportsBetTx({ userId, eventId: matchId, market, selection, selectionName,  stake: Number(stake), odds, bookmakerKey, deductAmount, lay });
+      let betPlacedData = await placeSportsBetTx({ userId, eventId: matchId, market, selection, selectionName, stake: Number(stake), odds, bookmakerKey, deductAmount, lay });
       console.log("Bet placed data:", betPlacedData);
 
       if (betPlacedData.ok) {
+
         if (findCashOut.profitHeld > 0) {
           findCashOut.status = "OPEN";
         } else {
           findCashOut.status = "SETTLED";
         }
         await findCashOut.save().catch(e => console.log("Error saving cashout:", e.message));
+        await Bet.create({
+          type: "cashout",
+          stake: Number(stake),
+          eventId: matchId,
+          userId: userId,
+          profitHeld: Number(constProfitRecord),
+          status: "LOCKED",
+        })
 
         const io = getIO();
         const sockets = await io.fetchSockets();
@@ -137,7 +157,7 @@ exports.takeBet = async (req, res) => {
     const userId = decoded.userID;
 
     // 1. Find all OPEN bets for this user + match
-    const bets = await Bet.find({ eventId: matchId, userId, status: "OPEN" });
+    const bets = await Bet.find({ eventId: matchId, userId, type: "sports", status: "OPEN" });
     if (!bets.length) {
       return res.status(404).json({ ok: false, message: "No open bets found" });
     }
@@ -154,8 +174,24 @@ exports.takeBet = async (req, res) => {
 
     if (!user) throw new Error("User not found");
 
-    if (result.profitNow > 1) {
-      user.balance += result.held;
+    const prevCashOut = await Bet.findOne({ eventId: matchId, userId, type: "cashout", status: "LOCKED" });
+    
+    console.log(prevCashOut);
+    let prevProfitLoss = Number(prevCashOut.profitHeld);
+    let profitNow = Number(result.profitNow) + Number(prevCashOut.profitHeld)
+    console.log("Profit Prev: ", profitNow);
+
+    let newProfit = Number(result.profitNow);
+
+
+    if (profitNow > 1) {
+      if (prevProfitLoss>0) {
+        let balanceUpdate = Number(result.held) - prevProfitLoss;
+        console.log("Balance Updt: ",balanceUpdate);        
+        user.balance += balanceUpdate;
+      }else{
+        user.balance += result.held
+      }      
     } else {
       if (result.payoutNow > 0) {
         user.balance += result.payoutNow;
@@ -164,17 +200,32 @@ exports.takeBet = async (req, res) => {
     console.log("Balance: ", user.balance);
 
     await user.save();
+
+    const openCashOut = await Bet.findOne({ eventId: matchId, userId, type: "cashout", status: "OPEN" });
+
+    if (openCashOut) {
+      newProfit += Number(openCashOut.profitHeld)
+    }
     // 4. Mark bets as cashed out
     await Bet.updateMany(
-      { eventId: matchId, userId, status: "OPEN" },
+      { eventId: matchId, userId, type: "sports", status: "OPEN" },
       { $set: { status: "SETTLED" } }
     );
 
     await Bet.findOneAndUpdate(
-      { eventId: matchId, userId, type: "cashout" },
+      { eventId: matchId, userId, type: "cashout", status: "LOCKED"  },
       {
         $set: {
-          profitHeld: result.profitNow,
+          status: "SETTLED"
+        }
+      }
+    );
+
+    await Bet.findOneAndUpdate(
+      { eventId: matchId, userId, type: "cashout", status: "OPEN"  },
+      {
+        $set: {
+          profitHeld: newProfit,
           status: "OPEN"
         }
       },
