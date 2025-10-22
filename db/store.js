@@ -114,7 +114,7 @@ async function placeBetTx({ userId, game, tableId, roundId, market, stake }) {
 
     const u = await User.findOneAndUpdate(
       { _id: userId, balance: { $gte: stake } },
-      { $inc: { balance: -stake, exp:-stake } },
+      { $inc: { balance: -stake, exp: -stake } },
       { new: true, session }
     );
     if (!u) throw new Error('INSUFFICIENT_FUNDS');
@@ -177,13 +177,23 @@ async function placeBetTx({ userId, game, tableId, roundId, market, stake }) {
 // ---------- sports bet placement (HTTP route) ----------
 async function placeSportsBetTx({ userId, eventId, market, selection, selectionName, stake, odds, lay, deductAmount }) {
   // console.log("USerID: u", userId);
+  console.log("✅ placeSportsBetTx executing with deductAmount:", deductAmount);
+
 
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
+    const rawDeduct = Number(deductAmount);
+    if (isNaN(rawDeduct) || rawDeduct <= 0) {
+      console.error("❌ Invalid deductAmount received:", deductAmount);
+      throw new Error(`Invalid deductAmount (${deductAmount})`);
+    }
+    const amountToDeduct = rawDeduct;
+    console.log("SELECTION TEAM: ",selectionName);
+    
     const u = await User.findOneAndUpdate(
-      { _id: userId, balance: { $gte: deductAmount } },
-      { $inc: { balance: -deductAmount, exp:-deductAmount } },
+      { _id: userId, balance: { $gte: amountToDeduct } },
+      { $inc: { balance: -amountToDeduct, exp: -amountToDeduct } },
       { new: true, session }
     );
     if (!u) throw new Error('INSUFFICIENT_FUNDS');
@@ -298,7 +308,7 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
           walletIncs.push({
             updateOne: {
               filter: { _id: b.userId },
-              update: { $inc: { balance: Number(payout), exp: Number(payout)} },
+              update: { $inc: { balance: Number(payout), exp: Number(payout) } },
             },
           });
           txDocs.push({
@@ -352,7 +362,7 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
           walletIncs.push({
             updateOne: {
               filter: { _id: b.userId },
-              update: { $inc: { balance: Number(payout), exp: Number(payout)} },
+              update: { $inc: { balance: Number(payout), exp: Number(payout) } },
             },
           });
           txDocs.push({
@@ -401,7 +411,7 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
           walletIncs.push({
             updateOne: {
               filter: { _id: b.userId },
-              update: { $inc: { balance: Number(payout), exp: Number(payout)} },
+              update: { $inc: { balance: Number(payout), exp: Number(payout) } },
             },
           });
           txDocs.push({
@@ -462,7 +472,7 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
           walletIncs.push({
             updateOne: {
               filter: { _id: b.userId },
-              update: { $inc: { balance: Number(payout), exp: Number(payout)} },
+              update: { $inc: { balance: Number(payout), exp: Number(payout) } },
             },
           });
           txDocs.push({

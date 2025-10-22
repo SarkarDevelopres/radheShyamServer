@@ -9,91 +9,127 @@ dotenv.config();
 const { getIO } = require('../socket');
 
 exports.placeBets = async (req, res) => {
-
   try {
+    // console.log("Incoming bet request:", req.body);
+
     const { token, matchId, market, bookmakerKey, selectionName, selection, stake, odds, lay, minusAmnt } = req.body;
-    let deductAmount = minusAmnt;
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // console.log("Stake received:", stake);
+
+    if (!token) return res.status(400).json({ ok: false, message: "Missing token" });
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      console.log("JWT verification failed:", err.message);
+      return res.status(401).json({ ok: false, message: "Invalid token" });
+    }
+
     const userId = decoded.userID;
+    // console.log("Decoded userId:", userId);
 
     // sanity checks
-    if (!Number.isInteger(stake) || stake <= 0) return res.status(400).json({ error: 'Invalid stake' });
-    if (odds <= 1) return res.status(400).json({ error: 'Invalid odds' });
-
-    if (odds > 40) {
-      return res.status(400).json({ error: 'Error cannot place bet!' });
+    if (!Number.isInteger(stake) || stake <= 0) {
+      console.log("Invalid stake:", stake);
+      return res.status(400).json({ ok: false, message: "Invalid stake" });
+    }
+    if (odds <= 1 || odds > 40) {
+      console.log("Invalid odds:", odds);
+      return res.status(400).json({ ok: false, message: "Invalid odds" });
     }
 
-    let findCashOut = await Bet.findOne({ userId: userId, eventId: matchId, status: "OPEN", type: "cashout" });
+    let deductAmount = Number(minusAmnt);
+    if (isNaN(deductAmount) || deductAmount <= 0) {
+      console.log("❌ Invalid minusAmnt received:", minusAmnt);
+      throw new Error("Invalid or missing minusAmnt; must be a positive number");
+    }
+    // console.log("Deduct Amount:", deductAmount);
 
-    if (!findCashOut || findCashOut.profitHeld <= 0) {
+    let findCashOut = await Bet.findOne({ userId, eventId: matchId, status: "OPEN", type: "cashout" });
+    // console.log("findCashOut result:", findCashOut);
 
-      let betPlacedData = await placeSportsBetTx({ userId, eventId: matchId, market, selection, selectionName, stake, odds, lay, deductAmount });
-      console.log(betPlacedData);
+    if (!findCashOut || !findCashOut.profitHeld || findCashOut.profitHeld <= 0) {
+      console.log("No active cashout or profitHeld ≤ 0, placing normal bet");
+      let betPlacedData = await placeSportsBetTx({ userId, eventId: matchId, market, selection, selectionName, stake, odds, bookmakerKey, deductAmount,lay });
+      console.log("Bet placed data:", betPlacedData);
 
       if (betPlacedData.ok) {
         const io = getIO();
         const sockets = await io.fetchSockets();
-
-        for (const sock of sockets) {
-
-          if (!sock.userID) continue;  // skip game sockets
-
+        sockets.forEach(sock => {
+          if (!sock.userID) return;
           sock.emit("wallet:update", betPlacedData);
           sock.emit("exp:update", betPlacedData);
-        }
-        res.status(200).json({ ok: true, data: betPlacedData, message: "Bet placed successfully !" });
+        });
+        return res.status(200).json({ ok: true, data: betPlacedData, message: "Bet placed successfully!" });
+      } else {
+        console.log("Insufficient funds or placement failed");
+        return res.status(400).json({ ok: false, message: "Insufficient Balance!" });
       }
-      else {
-        res.status(300).json({ ok: false, message: "Insufficeint Balance !" });
-      }
-    }
-    else {
-      if (stake >= findCashOut.profitHeld) {
-        deductAmount = stake - findCashOut.profitHeld;
-        findCashOut.profitHeld = 0;
-      }
-      else {
-        deductAmount = 0;
-        findCashOut.profitHeld = findCashOut.profitHeld - stake;
 
+    } else {
+      // console.log("Existing cashout found:", findCashOut);
+      const stakeNum = Number(stake);
+      let profitHeld = Number(findCashOut.profitHeld || 0);
+
+      if (isNaN(stakeNum) || isNaN(profitHeld)) {
+        throw new Error(`Invalid numeric values: stake=${stake}, profitHeld=${findCashOut.profitHeld}`);
       }
-      let betPlacedData = await placeSportsBetTx({ userId, eventId: matchId, market, selection, selectionName, stake, odds, lay, deductAmount });
-      console.log(betPlacedData);
+
+      if (stakeNum >= profitHeld) {
+        // Case 1: stake uses up all profitHeld, remaining from wallet
+        deductAmount = stakeNum - profitHeld;
+        profitHeld = 0;
+        console.log(`🟢 Stake (${stakeNum}) ≥ profitHeld (${findCashOut.profitHeld}) → deduct ${deductAmount}, profitHeld now 0`);
+      } else {
+        // Case 2: stake fully covered by profitHeld
+        deductAmount = 0;
+        profitHeld = profitHeld - stakeNum;
+        console.log(`🟡 Stake (${stakeNum}) < profitHeld (${findCashOut.profitHeld}) → deduct 0, profitHeld now ${profitHeld}`);
+      }
+
+      // persist updated profitHeld
+      // console.log(findCashOut);
+      
+      findCashOut.profitHeld = profitHeld;
+      await findCashOut.save();
+      // console.log("Adjusted profitHeld:", findCashOut.profitHeld, "Deduct:", deductAmount);
+
+      let betPlacedData = await placeSportsBetTx({ userId, eventId: matchId, market, selection, selectionName,  stake: Number(stake), odds, bookmakerKey, deductAmount, lay });
+      console.log("Bet placed data:", betPlacedData);
 
       if (betPlacedData.ok) {
-
         if (findCashOut.profitHeld > 0) {
-          await findCashOut.save();
+          findCashOut.status = "OPEN";
         } else {
           findCashOut.status = "SETTLED";
-          await findCashOut.save();
         }
+        await findCashOut.save().catch(e => console.log("Error saving cashout:", e.message));
+
         const io = getIO();
         const sockets = await io.fetchSockets();
-
-        for (const sock of sockets) {
-
-          if (!sock.userID) continue;  // skip game sockets
-
+        sockets.forEach(sock => {
+          if (!sock.userID) return;
           sock.emit("wallet:update", betPlacedData);
           sock.emit("exp:update", betPlacedData);
-        }
-        res.status(200).json({ ok: true, data: betPlacedData, message: "Bet placed successfully !" });
-      }
-      else {
-        res.status(300).json({ ok: false, message: "Insufficeint Balance !" });
+        });
+        return res.status(200).json({ ok: true, data: betPlacedData, message: "Bet placed successfully!" });
+      } else {
+        console.log("Insufficient funds or placement failed (cashout)");
+        return res.status(400).json({ ok: false, message: "Insufficient Balance!" });
       }
     }
 
   } catch (error) {
-    res.status(200).json({ ok: false, message: error.message });
+    console.log("❌ Unhandled error in placeBets:", error);
+    res.status(500).json({ ok: false, message: error.message });
   }
+};
 
-}
 
 exports.takeBet = async (req, res) => {
   try {
+    console.log("I am called");
+
     const { token, matchId, oddsBook } = req.body;
     // oddsBook should be sent from frontend: { "Team A": { back:2.0, lay:2.02 }, ... }
 
@@ -108,6 +144,8 @@ exports.takeBet = async (req, res) => {
 
     // 2. Run cashout calculation
     const result = cashoutPortfolio(bets, oddsBook);
+    console.log(result);
+
 
     if (result.unavailable) {
       return res.status(400).json({ ok: false, message: "Cashout unavailable" });
@@ -119,10 +157,11 @@ exports.takeBet = async (req, res) => {
     if (result.profitNow > 1) {
       user.balance += result.held;
     } else {
-      if (result.payoutNow>0) {
+      if (result.payoutNow > 0) {
         user.balance += result.payoutNow;
       }
     }
+    console.log("Balance: ", user.balance);
 
     await user.save();
     // 4. Mark bets as cashed out

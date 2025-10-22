@@ -25,7 +25,7 @@ const BetSchema = new mongoose.Schema({
   roundId: { type: mongoose.Schema.Types.ObjectId, ref: 'Round', index: true },
 
   // Common
-  stake: { type: Number, required: true},
+  stake: { type: Number},
   potentialPayout: { type: Number },          // precomputed if applicable
   payout: { type: Number, default: 0 },
 

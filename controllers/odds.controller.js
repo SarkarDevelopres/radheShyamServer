@@ -54,13 +54,21 @@ const handleSport = async (req, res, sport) => {
   }
 };
 
+exports.handleDeadSport = async(req,res) => {
+  try {
+    return res.status(200).json({ok:true,data:[],message:"no sport yet"});
+  } catch (error) {
+    
+  }
+}
+
 
 // ------------------------- Exports -------------------------
 exports.cricket = (req, res) => handleSport(req, res, 'cricket');
-exports.football = (req, res) => handleSport(req, res, 'soccer');
 exports.tennis = (req, res) => handleSport(req, res, 'tennis');
-exports.baseball = (req, res) => handleSport(req, res, 'baseball');
-exports.basketball = (req, res) => handleSport(req, res, 'basketball_nba');
+exports.football = (req, res) => handleDeadSport(req, res, 'soccer');
+exports.baseball = (req, res) => handleDeadSport(req, res, 'baseball');
+exports.basketball = (req, res) => handleDeadSport(req, res, 'basketball_nba');
 
 // ------------------------- Live endpoint -------------------------
 function isNewerThan(date, minutes = 5) {
