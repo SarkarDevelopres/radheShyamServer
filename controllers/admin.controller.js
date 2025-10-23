@@ -1000,7 +1000,7 @@ exports.matchList = async (req, res) => {
     try {
         const matchListRaw = await Matchs.find()
             .select("teamHome teamAway sport idOdds winner status start_time_ist")
-            .sort({ createdAt: -1 })
+            .sort({ start_time: -1 })
             .limit(500)
             .lean();
 
