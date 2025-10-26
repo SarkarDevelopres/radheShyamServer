@@ -3,6 +3,18 @@
 const { performance, monitorEventLoopDelay } = require('perf_hooks');
 const { fetchBalance } = require("../db/store");
 
+const generateRandomNo = () => {
+  let randomViewer = Math.floor(Math.random() * 56) + 1
+  return randomViewer;
+}
+
+const generateRandomWinnerLoser = (viewers) => {
+  let randomWinnerPercent = Math.floor(Math.random() * 60) + 1;
+  let randomWinners = Math.floor((viewers * randomWinnerPercent) / 100);
+  let randomLosers = viewers - randomWinners;
+
+  return { winners: randomWinners, losers: randomLosers }
+}
 
 class RoundEngine {
   constructor({
@@ -60,6 +72,9 @@ class RoundEngine {
         this._lag.reset();
       }, 2000).unref();
     }
+
+    // random viewer
+    this.viewers = 1;
   }
 
   roomKey() {
@@ -68,8 +83,8 @@ class RoundEngine {
 
   publicRound() {
     const { _id, startAt, status } = this.round || {};
-    console.log("ID: ",_id);
-    
+    console.log("ID: ", _id);
+
     return {
       id: _id || null,
       game: this.game,
@@ -152,9 +167,11 @@ class RoundEngine {
         if (this.hooks.decorateSnapshot) {
           try { snap = this.hooks.decorateSnapshot(snap) || snap; } catch (e) { console.error("decorateSnapshot error", e); }
         }
-        this.io.to(this.roomKey()).emit('round:start', snap);
+        this.viewers = generateRandomNo();
+        let viewrSnap = { ...snap, viewers: this.viewers }
+        this.io.to(this.roomKey()).emit('round:start', viewrSnap);
 
-        
+
         console.log(`[engine ${this.roomKey()}] Round Created! id=${this.round?._id}`);
       })
       .catch(err => {
@@ -224,7 +241,7 @@ class RoundEngine {
       } catch (err) {
         console.error(`[engine ${this.roomKey()}] onComputeResult error:`, err);
       }
-
+      let randomWinnersLosers = generateRandomWinnerLoser(this.viewers);
       // console.log("Result Is: ", result);
       // Emit RESULT immediately
       this.io.to(this.roomKey()).emit('round:result', {
@@ -232,6 +249,7 @@ class RoundEngine {
         game: this.game,
         tableId: this.tableId,
         ...(result || { noResult: true }),
+        ...randomWinnersLosers
       });
 
 
@@ -306,7 +324,7 @@ class RoundEngine {
     // fire-and-forget onEnd
     if (this.hooks.onEnd && this.round?._id) {
       Promise.resolve()
-        .then(async() => {
+        .then(async () => {
           this.hooks.onEnd(this.round._id)
 
           const sockets = await this.io.fetchSockets();
