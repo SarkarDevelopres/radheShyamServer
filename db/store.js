@@ -116,8 +116,8 @@ async function placeBetTx({ userId, game, tableId, roundId, market, stake }) {
   session.startTransaction();
   try {
     const r = await Round.findById(roundId).session(session);
-    console.log("Round Data: ",r);
-    
+    console.log("Round Data: ", r);
+
     if (!r || r.status !== 'OPEN' || Date.now() >= toMs(r.betsCloseAt)) {
       throw new Error('BETS_LOCKED');
     }
@@ -263,11 +263,11 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
     session.startTransaction();
 
     // 1) Load round & idempotency guard
-    const round = await Round.findById(roundId).session(session);
-    if (!round) throw new Error(`Round ${roundId} not found`);
-    if (round.status === 'SETTLED') {
-      return { ok: true, alreadySettled: true, outcome: round.outcome };
-    }
+    // const round = await Round.findById(roundId).session(session);
+    // if (!round) throw new Error(`Round ${roundId} not found`);
+    // if (round.status === 'SETTLED') {
+    //   return { ok: true, alreadySettled: true, outcome: round.outcome };
+    // }
 
     const canonGame = normalize(game);
     const canonOutcome = outcome.card;
@@ -282,12 +282,25 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
     const betUpdates = [];
     const walletIncs = []; // bulk ops for User
     const txDocs = [];
+    const roundDocs = [];
     let totalPayout = 0;
     let winners = 0;
     let losers = 0;
     let pushes = 0;
 
     if (canonGame === 'SEVEN_UP_DOWN') {
+
+      roundDocs.push({
+        updateOne: {
+          filter: { _id: roundId },
+          update: {
+            $set: {
+              result: { winner: canonFirstOutcome },
+              status:'SETTLED',
+            }
+          }
+        }
+      })
 
       // console.log("I TOO WAS CALLED");
       for (const b of bets) {
@@ -338,6 +351,17 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
       }
     } else if (canonGame === 'HIGH_LOW') {
 
+      roundDocs.push({
+        updateOne: {
+          filter: { _id: roundId },
+          update: {
+            $set: {
+              result: { winner: canonFirstOutcome },
+              status:'SETTLED',
+            }
+          }
+        }
+      })
 
       const tiePush = meta.tiePush !== false;
       const marketWins = canonOutcome === 'HIGH' ? 'high' : canonOutcome === 'LOW' ? 'low' : null;
@@ -392,6 +416,19 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
       }
     }
     else if (canonGame === "AMAR_AKBAR_ANTHONY") {
+
+      roundDocs.push({
+        updateOne:{
+          filter: {_id:roundId},
+          update:{
+            $set:{
+              result: { winner: canonFirstOutcome},
+              status:'SETTLED',
+            }
+          }
+        }
+      })
+
       for (const b of bets) {
         const pick = normalize(b.market);                 // "AMAR" | "AKBAR" | "ANTHONY"
         const won = pick === canonFirstOutcome || pick === canonGroupOutcome || pick == canonSuitOutcome;
@@ -439,6 +476,19 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
       }
     }
     else if (canonGame === "DRAGON_TIGER") {
+
+      roundDocs.push({
+        updateOne:{
+          filter: {_id:roundId},
+          update:{
+            $set:{
+              result: { winner: canonFirstOutcome},
+              status:'SETTLED',
+            }
+          }
+        }
+      })
+
       const result = normalize(outcome.result);
       const roundOdds = odds
       const tSuit = normalize(outcome.tigerSuit);
@@ -500,13 +550,26 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
       }
     }
     else if (canonGame === 'ANDAR_BAHAR') {
+
+      roundDocs.push({
+        updateOne:{
+          filter: {_id:roundId},
+          update:{
+            $set:{
+              result: { winner: canonFirstOutcome},
+              status:'SETTLED',
+            }
+          }
+        }
+      })
+
       for (const b of bets) {
         const pick = normalize(b.market); // e.g., 'ANDAR', 'BAHAR'
-        console.log("PICK: ",pick);
-        
+        console.log("PICK: ", pick);
+
         const won = pick === canonFirstOutcome;
-        console.log("Winenr: ",canonFirstOutcome);
-        
+        console.log("Winenr: ", canonFirstOutcome);
+
         const odd = won ? (AndarBaharODDS[pick] || 0) : 0;
         const payout = won ? Math.round(b.stake * odd) : 0;
 
@@ -526,12 +589,13 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
           },
         });
 
-        if (payout > 0){
+        if (payout > 0) {
           console.log("I am called");
-          
+
           walletIncs.push({
             updateOne: { filter: { _id: b.userId }, update: { $inc: { balance: payout } } },
-          });}
+          });
+        }
       }
     }
     else {
@@ -550,26 +614,21 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
 
     if (txDocs.length) await Transaction.insertMany(txDocs, { session });
 
+    console.log(roundDocs);
+    
+    if(roundDocs.length) {
+     let changedRounds = await Round.bulkWrite(roundDocs);
+     console.log(changedRounds);    
+    
+    }
+
     // 5) Mark round settled + store outcome/meta/summary
-    round.status = 'SETTLED';          // canonical round phase
+
     // If (and only if) your UI insists on 'WON'/'LOST' for round.status, switch to:
     // round.status = 'CLOSED';
     // console.log(winners);
-
-    round.outcome = canonOutcome;
-    round.summary = {
-      winners,
-      losers,
-      pushes,
-      totalPayout,
-      settledAt: new Date(),
-    };
-    if (meta) round.meta = { ...(round.meta || {}), ...meta };
-
-    await round.save({ session });
-
     await session.commitTransaction();
-    return { ok: true, settled: bets.length, outcome: outcome, summary: round.summary };
+    return { ok: true, settled: bets.length, outcome: outcome };
   } catch (e) {
     await session.abortTransaction().catch(() => { });
     console.error('settleRoundTx error:', e);

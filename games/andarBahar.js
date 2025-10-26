@@ -54,7 +54,7 @@ async function computeAndarBaharResult(roundId, joker) {
         }
     }
 
-    console.log("🎯 Worst exposure:", worst);
+    // console.log("🎯 Worst exposure:", worst);
 
     // 4️⃣ Canonical data
     let andarSuits = [...SUITS];
@@ -81,8 +81,8 @@ async function computeAndarBaharResult(roundId, joker) {
         }
     }
 
-    console.log("ANDAR SUITS: ",andarSuits);
-    console.log("BAHAR SUITS: ",baharSuits);
+    // console.log("ANDAR SUITS: ",andarSuits);
+    // console.log("BAHAR SUITS: ",baharSuits);
     
 
     // 5️⃣ Random suits
@@ -91,7 +91,7 @@ async function computeAndarBaharResult(roundId, joker) {
 
     // 6️⃣ Winner logic (with 70% bias)
     let winner, andarCard, baharCard;
-    console.log("JOKER: ",joker);
+    // console.log("JOKER: ",joker);
     
     const rank = joker.rank;
 
@@ -125,7 +125,7 @@ async function computeAndarBaharResult(roundId, joker) {
         },
     };
 
-    console.log("🏁 Final biased outcome:", outcome);
+    // console.log("🏁 Final biased outcome:", outcome);
 
     return { andarCard, baharCard, winner };
 }

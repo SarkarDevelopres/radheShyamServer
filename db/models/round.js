@@ -7,7 +7,7 @@ const RoundSchema = new mongoose.Schema({
   betsCloseAt: Number,
   settleAt: Number,
   status: { type: String, enum: ['OPEN','LOCKED','SETTLED'], index: true },
-  result: { d1: Number, d2: Number, total: Number, outcome: String }, // set at settle
+  result: { type: Object }, // set at settle
 }, { timestamps: true });
 
 module.exports = mongoose.model('Round', RoundSchema);

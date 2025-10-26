@@ -2,20 +2,32 @@
 'use strict';
 const { performance, monitorEventLoopDelay } = require('perf_hooks');
 const { fetchBalance } = require("../db/store");
+const Round = require('../db/models/round');
 
 const generateRandomNo = () => {
-  let randomViewer = Math.floor(Math.random() * 56) + 1
+  let randomViewer = Math.floor(Math.random() * 66) + 10
   return randomViewer;
 }
 
 const generateRandomWinnerLoser = (viewers) => {
-  let randomWinnerPercent = Math.floor(Math.random() * 60) + 1;
-  let randomWinners = Math.floor((viewers * randomWinnerPercent) / 100);
-  let randomLosers = viewers - randomWinners;
+  const winPercent = Math.floor(Math.random() * 31) + 40; // 40–70%
+  const winners = Math.floor((viewers * winPercent) / 100);
+  const losers = viewers - winners;
 
-  return { winners: randomWinners, losers: randomLosers }
+  return { winners: winners, losers: losers }
 }
 
+const fetchLast5RoundsResult = async (game_name) => {
+  let resultData = await Round.find({ game: game_name })
+    .sort({ createdAt: -1 })
+    .skip(1)
+    .limit(5)
+    .select('result status -_id');
+
+  let finalResultList = resultData.reverse().map(r => r.result?.winner);
+
+  return finalResultList;
+}
 class RoundEngine {
   constructor({
     io,
@@ -83,7 +95,7 @@ class RoundEngine {
 
   publicRound() {
     const { _id, startAt, status } = this.round || {};
-    console.log("ID: ", _id);
+    // console.log("ID: ", _id);
 
     return {
       id: _id || null,
@@ -119,8 +131,6 @@ class RoundEngine {
   async nextRound() {
     if (!this.running) return;
 
-    // console.log(`[engine ${this.roomKey()}] Round starting (pid=${process.pid})`);
-
     // new nonce to invalidate any stray timers from old rounds
     this._nonce += 1;
     const nonce = this._nonce;
@@ -144,8 +154,6 @@ class RoundEngine {
     this._resultT = setTimeout(() => this.resultIfCurrent(nonce).catch(console.error), this.ROUND_MS);
     this._endT = setTimeout(() => this.endIfCurrent(nonce).catch(console.error), this.ROUND_MS + this.RESULT_SHOW_MS);
 
-    // console.log(`[engine ${this.roomKey()}] timers set: lock=${this.BET_MS}ms result=${this.ROUND_MS}ms end=${this.ROUND_MS + this.RESULT_SHOW_MS}ms`);
-
     // Persist round ASYNC (do not block scheduling)
     const payload = {
       game: this.game,
@@ -158,21 +166,28 @@ class RoundEngine {
     };
 
     Promise.resolve()
-      .then(() => this.hooks.onCreateRound?.(payload))
-      .then((round) => {
+      .then(async () => {
+        // ✅ mark callback async so we can use await inside
+        const round = await this.hooks.onCreateRound?.(payload);
         if (this._nonce !== nonce) return; // stale create
-        // console.log("SNAP: ",round);
+
         this.round = round || { _id: null, startAt: startAtEpoch, status: 'OPEN' };
         let snap = this.publicRound();
+
         if (this.hooks.decorateSnapshot) {
-          try { snap = this.hooks.decorateSnapshot(snap) || snap; } catch (e) { console.error("decorateSnapshot error", e); }
+          try {
+            snap = this.hooks.decorateSnapshot(snap) || snap;
+          } catch (e) {
+            console.error("decorateSnapshot error", e);
+          }
         }
+
         this.viewers = generateRandomNo();
-        let viewrSnap = { ...snap, viewers: this.viewers }
+        const resultList = await fetchLast5RoundsResult(this.game);
+        console.log(`Last 5 results for ${this.game}: `, resultList);
+
+        const viewrSnap = { ...snap, viewers: this.viewers, resultList };
         this.io.to(this.roomKey()).emit('round:start', viewrSnap);
-
-
-        console.log(`[engine ${this.roomKey()}] Round Created! id=${this.round?._id}`);
       })
       .catch(err => {
         console.error(`[engine ${this.roomKey()}] onCreateRound error:`, err);
@@ -182,6 +197,7 @@ class RoundEngine {
         }
       });
   }
+
 
   // ---- PHASES ----
 
@@ -238,6 +254,7 @@ class RoundEngine {
       // Preferred: pure, synchronous RNG (no DB)
       try {
         result = await this.hooks.onComputeResult(this.round?._id);
+
       } catch (err) {
         console.error(`[engine ${this.roomKey()}] onComputeResult error:`, err);
       }
