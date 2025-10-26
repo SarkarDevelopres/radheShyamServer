@@ -131,8 +131,15 @@ exports.setMatch = async (req, res) => {
         sessionOdds: []
     })
 
-    return res.status(200).json({ok:true});
+    return res.status(200).json({ ok: true });
 }
 exports.completeMatch = async (req, res) => {
 
+}
+exports.completeTennisMatch = async (req, res) => {
+    const result = await Matchs.deleteMany(
+        { sport: "tennis", start_time: {$lt: 1761337800000} }
+    );
+
+    return res.status(200).json({ ok: true, changedMatches:result })
 }

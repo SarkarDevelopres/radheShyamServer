@@ -47,6 +47,14 @@ const HLODDS = {
   SPADES: 3.9     // ≈25% → ~2.5% edge
 };
 
+const AndarBaharODDS = {
+  ANDAR: 1.9,
+  BAHAR: 2.0,
+  ANDAR_BLACK: 1.9,
+  BAHAR_RED: 1.9,
+  ANDAR_RED: 1.9,
+  BAHAR_BLACK: 1.9,
+};
 
 // ---------- helpers ----------
 const normalize = (v) => (typeof v === 'string' ? v.trim().toUpperCase() : v);
@@ -108,6 +116,8 @@ async function placeBetTx({ userId, game, tableId, roundId, market, stake }) {
   session.startTransaction();
   try {
     const r = await Round.findById(roundId).session(session);
+    console.log("Round Data: ",r);
+    
     if (!r || r.status !== 'OPEN' || Date.now() >= toMs(r.betsCloseAt)) {
       throw new Error('BETS_LOCKED');
     }
@@ -189,8 +199,8 @@ async function placeSportsBetTx({ userId, eventId, market, selection, selectionN
       throw new Error(`Invalid deductAmount (${deductAmount})`);
     }
     const amountToDeduct = rawDeduct;
-    console.log("SELECTION TEAM: ",selectionName);
-    
+    console.log("SELECTION TEAM: ", selectionName);
+
     const u = await User.findOneAndUpdate(
       { _id: userId, balance: { $gte: amountToDeduct } },
       { $inc: { balance: -amountToDeduct, exp: -amountToDeduct } },
@@ -487,6 +497,41 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
         } else {
           losers++;
         }
+      }
+    }
+    else if (canonGame === 'ANDAR_BAHAR') {
+      for (const b of bets) {
+        const pick = normalize(b.market); // e.g., 'ANDAR', 'BAHAR'
+        console.log("PICK: ",pick);
+        
+        const won = pick === canonFirstOutcome;
+        console.log("Winenr: ",canonFirstOutcome);
+        
+        const odd = won ? (AndarBaharODDS[pick] || 0) : 0;
+        const payout = won ? Math.round(b.stake * odd) : 0;
+
+        betUpdates.push({
+          updateOne: {
+            filter: { _id: b._id },
+            update: {
+              $set: {
+                settled: true,
+                status: won ? 'WON' : 'LOST',
+                payout,
+                outcome: canonFirstOutcome,
+                meta,
+                settledAt: new Date(),
+              },
+            },
+          },
+        });
+
+        if (payout > 0){
+          console.log("I am called");
+          
+          walletIncs.push({
+            updateOne: { filter: { _id: b.userId }, update: { $inc: { balance: payout } } },
+          });}
       }
     }
     else {

@@ -68,6 +68,8 @@ class RoundEngine {
 
   publicRound() {
     const { _id, startAt, status } = this.round || {};
+    console.log("ID: ",_id);
+    
     return {
       id: _id || null,
       game: this.game,
@@ -144,15 +146,16 @@ class RoundEngine {
       .then(() => this.hooks.onCreateRound?.(payload))
       .then((round) => {
         if (this._nonce !== nonce) return; // stale create
+        // console.log("SNAP: ",round);
         this.round = round || { _id: null, startAt: startAtEpoch, status: 'OPEN' };
         let snap = this.publicRound();
         if (this.hooks.decorateSnapshot) {
           try { snap = this.hooks.decorateSnapshot(snap) || snap; } catch (e) { console.error("decorateSnapshot error", e); }
         }
         this.io.to(this.roomKey()).emit('round:start', snap);
-        // console.log("SNAP: ",snap);
+
         
-        // console.log(`[engine ${this.roomKey()}] Round Created! id=${this.round?._id}`);
+        console.log(`[engine ${this.roomKey()}] Round Created! id=${this.round?._id}`);
       })
       .catch(err => {
         console.error(`[engine ${this.roomKey()}] onCreateRound error:`, err);
@@ -217,7 +220,7 @@ class RoundEngine {
     if (this.hooks.onComputeResult) {
       // Preferred: pure, synchronous RNG (no DB)
       try {
-        result = this.hooks.onComputeResult(this.round?._id);
+        result = await this.hooks.onComputeResult(this.round?._id);
       } catch (err) {
         console.error(`[engine ${this.roomKey()}] onComputeResult error:`, err);
       }

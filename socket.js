@@ -5,8 +5,9 @@ const { initSevenUpDown } = require("./games/sevenUpDown");
 const { initHighLow } = require("./games/highlow");
 const { initAAA } = require("./games/aaa");
 const { initDragonTiger } = require("./games/dragontiger");
+const { initAndarBahar } = require("./games/andarBahar");
 const jwt = require('jsonwebtoken');
-const {add,remove} = require('./isWatched');
+const { add, remove } = require('./isWatched');
 const { getMatch } = require('./cache');
 
 let ioInstance = null;
@@ -19,6 +20,7 @@ function canonGameName(g) {
     return "HIGH_LOW";
   if (s === "high_low" || s === "highlow" || s === "hi_lo" || s === "hi_low")
     return "HIGH_LOW";
+  if (s === "andar_bahar" || s === "andarbahar") return "ANDAR_BAHAR";
   return g.toUpperCase();
 }
 
@@ -34,17 +36,19 @@ function attachSocket(server) {
   ioInstance = io;
 
   // --- Start game engines ---
-  const seven = initSevenUpDown(io, "table-1");
-  const highlow = initHighLow(io, "default");
-  const aaa = initAAA(io, "default");
-  const dragontiger = initDragonTiger(io, "default");
+  // const seven = initSevenUpDown(io, "table-1");
+  // const highlow = initHighLow(io, "default");
+  // const aaa = initAAA(io, "default");
+  // const dragontiger = initDragonTiger(io, "default");
+  const andarBahar = initAndarBahar(io, "table-1");
 
   // Registry so we can fetch engine by roomKey on join
   const engines = {
-    ["SEVEN_UP_DOWN:table-1"]: seven,
-    ["HIGH_LOW:default"]: highlow,
-    ["AMAR_AKBAR_ANTHONY:default"]: aaa,
-    ["DRAGON_TIGER:default"]: dragontiger,
+    // ["SEVEN_UP_DOWN:table-1"]: seven,
+    // ["HIGH_LOW:default"]: highlow,
+    // ["AMAR_AKBAR_ANTHONY:default"]: aaa,
+    // ["DRAGON_TIGER:default"]: dragontiger,
+    ["ANDAR_BAHAR:table-1"]: andarBahar,
   };
 
   io.on("connection", (socket) => {
@@ -52,18 +56,18 @@ function attachSocket(server) {
       // console.log("[socket] IN:", event, args[0]);
     });
     // --- Live scores: client joins/leaves a match room ---
-    
+
     socket.on('watch:join', (matchId) => {
       if (!matchId) return;
       add(matchId);
-      
+
       console.log("Socket Match ID:", matchId);
-      
+
       const room = `live:match:${matchId}`;
       socket.join(room);
       let data = getMatch(matchId);
-      console.log("Match Joined: ",data);
-            
+      console.log("Match Joined: ", data);
+
       socket.emit('watch:joined', { data });
     });
 
@@ -72,7 +76,7 @@ function attachSocket(server) {
       remove(matchId)
       const room = `live:match:${matchId}`;
       socket.leave(room);
-      
+
       socket.emit('watch:left', { matchId });
     });
 
