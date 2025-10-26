@@ -32,7 +32,7 @@ exports.placeBets = async (req, res) => {
       console.log("Invalid stake:", stake);
       return res.status(400).json({ ok: false, message: "Invalid stake" });
     }
-    if (odds <= 1 || odds > 40) {
+    if (odds <= 1 || odds > 15 ) {
       console.log("Invalid odds:", odds);
       return res.status(400).json({ ok: false, message: "Invalid odds" });
     }
