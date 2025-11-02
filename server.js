@@ -90,19 +90,19 @@ async function main() {
   const server = http.createServer(app);
   attachSocket(server);
 
-  connectEntity((matchId, latestSnapshot) => {
-    // emit immediately:
-    getIO().to(`live:match:${matchId}`).emit('score:update', latestSnapshot);
-    debounceBroadcast(matchId, latestSnapshot);
+  // connectEntity((matchId, latestSnapshot) => {
+  //   // emit immediately:
+  //   getIO().to(`live:match:${matchId}`).emit('score:update', latestSnapshot);
+  //   debounceBroadcast(matchId, latestSnapshot);
 
-  });
+  // });
 
-  connectTennis((matchId, latestSnapshot) => {
-    // emit immediately:
-    getIO().to(`live:match:${matchId}`).emit('score:update', latestSnapshot);
-    debounceBroadcast(matchId, latestSnapshot);
+  // connectTennis((matchId, latestSnapshot) => {
+  //   // emit immediately:
+  //   getIO().to(`live:match:${matchId}`).emit('score:update', latestSnapshot);
+  //   debounceBroadcast(matchId, latestSnapshot);
 
-  });
+  // });
 
   const PORT = process.env.PORT || 4000;
   server.listen(PORT, '0.0.0.0', () => {

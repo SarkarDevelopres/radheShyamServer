@@ -6,6 +6,10 @@ const { initHighLow } = require("./games/highlow");
 const { initAAA } = require("./games/aaa");
 const { initDragonTiger } = require("./games/dragontiger");
 const { initAndarBahar } = require("./games/andarBahar");
+const { initAndarBaharClassic } = require("./games/andarbaharClassic");
+const { initTeenpattiT20 } = require("./games/teenpatti2020");
+const { initTeenpattiPoint } = require("./games/teenpattiPoint");
+const { initAviator } = require("./games/aviator")
 const jwt = require('jsonwebtoken');
 const { add, remove } = require('./isWatched');
 const { getMatch } = require('./cache');
@@ -21,6 +25,9 @@ function canonGameName(g) {
   if (s === "high_low" || s === "highlow" || s === "hi_lo" || s === "hi_low")
     return "HIGH_LOW";
   if (s === "andar_bahar" || s === "andarbahar") return "ANDAR_BAHAR";
+  if (s === "andar_bahar_classic" || s === "andarbaharclassic") return "ANDAR_BAHAR_CLASSIC";
+  if (s === "teenppatti2020" || s === "teenppatti2020") return "TEENPATTI_2020";
+  if (s === "teenppattiPoint" || s === "teenppattiPoint") return "TEENPATTI_POINT";
   return g.toUpperCase();
 }
 
@@ -36,19 +43,27 @@ function attachSocket(server) {
   ioInstance = io;
 
   // --- Start game engines ---
-  const seven = initSevenUpDown(io, "table-1");
-  const highlow = initHighLow(io, "default");
-  const aaa = initAAA(io, "default");
-  const dragontiger = initDragonTiger(io, "default");
-  const andarBahar = initAndarBahar(io, "table-1");
+  // const seven = initSevenUpDown(io, "table-1");
+  // const highlow = initHighLow(io, "default");
+  // const aaa = initAAA(io, "default");
+  // const dragontiger = initDragonTiger(io, "default");
+  // const andarBahar = initAndarBahar(io, "table-1");
+  // const andarBaharClassic = initAndarBaharClassic(io, "default");
+  // const teenpatti2020 = initTeenpattiT20(io, "default");
+  // const teenpattiPoint = initTeenpattiPoint(io, "table-1");
+  const aviator = initAviator(io, "table-1");
 
   // Registry so we can fetch engine by roomKey on join
   const engines = {
-    ["SEVEN_UP_DOWN:table-1"]: seven,
-    ["HIGH_LOW:default"]: highlow,
-    ["AMAR_AKBAR_ANTHONY:default"]: aaa,
-    ["DRAGON_TIGER:default"]: dragontiger,
-    ["ANDAR_BAHAR:table-1"]: andarBahar,
+    // ["SEVEN_UP_DOWN:table-1"]: seven,
+    // ["HIGH_LOW:default"]: highlow,
+    // ["AMAR_AKBAR_ANTHONY:default"]: aaa,
+    // ["DRAGON_TIGER:default"]: dragontiger,
+    // ["ANDAR_BAHAR:table-1"]: andarBahar,
+    // ["ANDAR_BAHAR_CLASSIC:default"]:andarBaharClassic,
+    // ["TEENPATTI_2020:default"]:teenpatti2020,
+    // ["TEENPATTI_POINT:table-1"]:teenpattiPoint,
+    ["AVIATOR:table-1"]:aviator,
   };
 
   io.on("connection", (socket) => {

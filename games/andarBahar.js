@@ -9,7 +9,7 @@ let lastRoundId = null;
 // ---------- helpers ----------
 const SUITS = ["hearts", "diamonds", "clubs", "spades"];
 const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
-const RANK_VAL = Object.fromEntries(RANKS.map((r, i) => [r, i + 2]));
+const RANK_VAL = Object.fromEntries(RANKS.map((r, i) => [r, i + 1]));
 const RED_SUITS = ["hearts", "diamonds"];
 const BLACK_SUITS = ["clubs", "spades"];
 
