@@ -24,13 +24,13 @@ const random = (min, max) => Math.random() * (max - min) + min;
 function checkProfit(stakes, potentialPayouts) {
     const totalStake = stakes.reduce((sum, b) => sum + Number(b), 0);
     const totalPayout = potentialPayouts.reduce((sum, b) => sum + Number(b), 0);
-    console.log("Is Profit: ", totalStake > totalPayout);
+    // console.log("Is Profit: ", totalStake > totalPayout);
     return totalStake > totalPayout;
 }
 
 async function lookForProfitMarginToCrash(roundId) {
     try {
-        console.log("Profit/Loss Check Called");
+        // console.log("Profit/Loss Check Called");
         const bets = await Bet.find({ _id: roundId, status: "OPEN" })
             .select('stake potentialPayout -_id')
             .lean();
@@ -129,7 +129,7 @@ class AviatorEngine {
     incrementMultiplier() {
         // console.log("Multiplier Called");
         this.multiplier += random(0.01, 0.4)
-        console.log("Multipleir Value:  ", this.multiplier);
+        // console.log("Multipleir Value:  ", this.multiplier);
         this.io.to(this.roomKey()).emit("aviator:update", { multiplier: this.multiplier })
     }
 
@@ -163,6 +163,8 @@ class AviatorEngine {
             game: this.game,
             tableId: this.tableId,
             startAt: startAtEpoch,
+            settleAt: startAtEpoch + this._crashAt,
+            betsCloseAt: startAtEpoch + this._crashAt,
             status: 'OPEN',
         };
         const round = await this.hooks.onCreateRound(payload);
@@ -186,10 +188,12 @@ class AviatorEngine {
 
             this.round = round;
             this.id = String(round._id)
-            // console.log("ID stored in engine: ", this.id);
+            console.log("Round stored in engine: ", round);
 
             this.viewers = generateRandomNo();
-            let finalSnap = { ...round, viewers: this.viewers, multiplier: this.multiplier };
+            let finalSnap = { ...round._doc, viewers: this.viewers, multiplier: this.multiplier };
+            console.log("Final Snap: ",finalSnap);
+            
 
             this.io.to(this.roomKey()).emit('round:start', finalSnap);
         }

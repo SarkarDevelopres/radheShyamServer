@@ -1,6 +1,6 @@
 // socket.js
 const { Server } = require("socket.io");
-const { placeBetTx, fetchBalance, fetchExp } = require("./db/store");
+const { placeBetTx, fetchBalance, fetchExp, checkPrevAviatorBets } = require("./db/store");
 const { initSevenUpDown } = require("./games/sevenUpDown");
 const { initHighLow } = require("./games/highlow");
 const { initAAA } = require("./games/aaa");
@@ -43,27 +43,27 @@ function attachSocket(server) {
   ioInstance = io;
 
   // --- Start game engines ---
-  // const seven = initSevenUpDown(io, "table-1");
-  // const highlow = initHighLow(io, "default");
-  // const aaa = initAAA(io, "default");
-  // const dragontiger = initDragonTiger(io, "default");
-  // const andarBahar = initAndarBahar(io, "table-1");
-  // const andarBaharClassic = initAndarBaharClassic(io, "default");
-  // const teenpatti2020 = initTeenpattiT20(io, "default");
-  // const teenpattiPoint = initTeenpattiPoint(io, "table-1");
+  const seven = initSevenUpDown(io, "table-1");
+  const highlow = initHighLow(io, "default");
+  const aaa = initAAA(io, "default");
+  const dragontiger = initDragonTiger(io, "default");
+  const andarBahar = initAndarBahar(io, "table-1");
+  const andarBaharClassic = initAndarBaharClassic(io, "default");
+  const teenpatti2020 = initTeenpattiT20(io, "default");
+  const teenpattiPoint = initTeenpattiPoint(io, "table-1");
   const aviator = initAviator(io, "table-1");
 
   // Registry so we can fetch engine by roomKey on join
   const engines = {
-    // ["SEVEN_UP_DOWN:table-1"]: seven,
-    // ["HIGH_LOW:default"]: highlow,
-    // ["AMAR_AKBAR_ANTHONY:default"]: aaa,
-    // ["DRAGON_TIGER:default"]: dragontiger,
-    // ["ANDAR_BAHAR:table-1"]: andarBahar,
-    // ["ANDAR_BAHAR_CLASSIC:default"]:andarBaharClassic,
-    // ["TEENPATTI_2020:default"]:teenpatti2020,
-    // ["TEENPATTI_POINT:table-1"]:teenpattiPoint,
-    ["AVIATOR:table-1"]:aviator,
+    ["SEVEN_UP_DOWN:table-1"]: seven,
+    ["HIGH_LOW:default"]: highlow,
+    ["AMAR_AKBAR_ANTHONY:default"]: aaa,
+    ["DRAGON_TIGER:default"]: dragontiger,
+    ["ANDAR_BAHAR:table-1"]: andarBahar,
+    ["ANDAR_BAHAR_CLASSIC:default"]:andarBaharClassic,
+    ["TEENPATTI_2020:default"]:teenpatti2020,
+    ["TEENPATTI_POINT:table-1"]:teenpattiPoint,
+    ["AVIATOR:table-1"]: aviator,
   };
 
   io.on("connection", (socket) => {
@@ -195,6 +195,46 @@ function attachSocket(server) {
           const data = await fetchBalance(userID);
           io.to(`user:${userID}`).emit("wallet:update", { ok: true, ...data });
           cb?.(out);
+        } catch (e) {
+          console.error("[bet:place] error:", e);
+          cb?.({ ok: false, error: e?.message || "Bet failed" });
+        }
+      }
+    );
+    socket.on(
+      "bet:aviator",
+      async ({ userId, roundId, game, tableId, market, stake }, cb) => {
+        try {
+          const decoded = jwt.verify(userId, process.env.JWT_SECRET);
+          const userID = decoded.userID;
+          const canon = canonGameName(game);
+          const tid = tableId || "default";
+          console.log(
+            `[bet:place] user=${userId} game=${canon} table=${tid} market=${market} stake=${stake}`
+          );
+
+          let checkPreviousBets = await checkPrevAviatorBets({
+            userId: userID,
+            roundId,
+          })
+          console.log("PREVIOUS BETS EXISTS: ", checkPreviousBets);
+          
+          if (!checkPreviousBets) {
+            const out = await placeBetTx({
+              userId: userID,
+              roundId,
+              game: canon,     // store canonical game name
+              tableId: tid,
+              market,
+              stake: Number(stake),
+            });
+            const data = await fetchBalance(userID);
+            io.to(`user:${userID}`).emit("wallet:update", { ok: true, ...data });
+            cb?.(out);
+          }
+          else{
+            cb?.({ ok: false, message:"Bet failed" });
+          }
         } catch (e) {
           console.error("[bet:place] error:", e);
           cb?.({ ok: false, error: e?.message || "Bet failed" });

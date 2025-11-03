@@ -166,13 +166,27 @@ function checkIfWon(betMarket, { meta }) {
   return !!p[category]; // true if that property is true
 }
 
+async function checkPrevAviatorBets({userId, roundId}) {
+  // console.log("user Id: ",userId);
+  // console.log("round Id: ",roundId);
+  
+  if (!userId || !roundId) {
+    throw new Error('Invalid User_ID');
+  }
+  let exisitingbet = await Bet.countDocuments({ userId: userId, roundId: roundId });
+  if (exisitingbet>0) {
+    return true
+  }
+  else return false
+}
+
 // ---------- casino bet placement (socket flow) ----------
 async function placeBetTx({ userId, game, tableId, roundId, market, stake }) {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
     const r = await Round.findById(roundId).session(session);
-    console.log("Round Data: ", r);
+    // console.log("Round Data: ", r);
 
     if (!r || r.status !== 'OPEN' || Date.now() >= toMs(r.betsCloseAt)) {
       throw new Error('BETS_LOCKED');
@@ -201,6 +215,7 @@ async function placeBetTx({ userId, game, tableId, roundId, market, stake }) {
       }],
       { session }
     );
+    // console.log("BET IS:", betDoc);
 
     let txDoc;   // ✅ declare
     try {
@@ -717,10 +732,9 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
       })
 
       for (const b of bets) {
-        const pick = b.market;
-        let won = checkIfWon(pick, { meta });
-        const odd = won ? (TeenPattiODDS[pick] || 0) : 0;
-        const payout = won ? Math.round(b.stake * odd) : 0;
+        const pick = Number(b.market);
+        let won = b.status == "LOCKED" ? true : false;
+        const payout = won ? Math.round(b.stake * pick) : 0;
 
         betUpdates.push({
           updateOne: {
@@ -837,6 +851,7 @@ module.exports = {
   createRound,
   lockRound,
   unlockRound,
+  checkPrevAviatorBets,
   placeBetTx,        // casino
   placeSportsBetTx,  // sports
   settleRoundTx,

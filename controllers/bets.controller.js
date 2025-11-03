@@ -32,7 +32,7 @@ exports.placeBets = async (req, res) => {
       console.log("Invalid stake:", stake);
       return res.status(400).json({ ok: false, message: "Invalid stake" });
     }
-    if (odds <= 1 || odds > 15 ) {
+    if (odds <= 1 || odds > 15) {
       console.log("Invalid odds:", odds);
       return res.status(400).json({ ok: false, message: "Invalid odds" });
     }
@@ -88,7 +88,7 @@ exports.placeBets = async (req, res) => {
         // Case 1: stake uses up all profitHeld, remaining from wallet
         deductAmount = stakeNum - profitHeld;
         profitHeld = 0;
-        
+
         console.log(`🟢 Stake (${stakeNum}) ≥ profitHeld (${findCashOut.profitHeld}) → deduct ${deductAmount}, profitHeld now 0`);
       } else {
         // Case 2: stake fully covered by profitHeld
@@ -175,7 +175,7 @@ exports.takeBet = async (req, res) => {
     if (!user) throw new Error("User not found");
 
     const prevCashOut = await Bet.findOne({ eventId: matchId, userId, type: "cashout", status: "LOCKED" });
-    
+
     console.log(prevCashOut);
     let prevProfitLoss = Number(prevCashOut.profitHeld);
     let profitNow = Number(result.profitNow) + Number(prevCashOut.profitHeld)
@@ -185,13 +185,13 @@ exports.takeBet = async (req, res) => {
 
 
     if (profitNow > 1) {
-      if (prevProfitLoss>0) {
+      if (prevProfitLoss > 0) {
         let balanceUpdate = Number(result.held) - prevProfitLoss;
-        console.log("Balance Updt: ",balanceUpdate);        
+        console.log("Balance Updt: ", balanceUpdate);
         user.balance += balanceUpdate;
-      }else{
+      } else {
         user.balance += result.held
-      }      
+      }
     } else {
       if (result.payoutNow > 0) {
         user.balance += result.payoutNow;
@@ -213,7 +213,7 @@ exports.takeBet = async (req, res) => {
     );
 
     await Bet.findOneAndUpdate(
-      { eventId: matchId, userId, type: "cashout", status: "LOCKED"  },
+      { eventId: matchId, userId, type: "cashout", status: "LOCKED" },
       {
         $set: {
           status: "SETTLED"
@@ -222,7 +222,7 @@ exports.takeBet = async (req, res) => {
     );
 
     await Bet.findOneAndUpdate(
-      { eventId: matchId, userId, type: "cashout", status: "OPEN"  },
+      { eventId: matchId, userId, type: "cashout", status: "OPEN" },
       {
         $set: {
           profitHeld: newProfit,
@@ -286,3 +286,42 @@ exports.findCashout = async (req, res) => {
     res.status(500).json({ ok: false, message: error.message })
   }
 }
+
+exports.cashInAviator = async (req, res) => {
+  try {
+    const { userToken, roundId } = req.body;
+
+    // Verify token and extract user
+    const decoded = jwt.verify(userToken, process.env.JWT_SECRET);
+    const userId = decoded.userID;
+
+    const bet = await Bet.findOne({ userId, roundId, status: "OPEN" });
+    // Find the user's open bet for this round
+    if (!bet) {
+      return res.status(400).json({ ok: false, message: "No bets found!" });
+    }
+
+    // Timing check
+    const betPlacedTime = new Date(bet.createdAt).getTime();
+    const now = Date.now();
+    const diff = now - betPlacedTime;
+
+    console.log("TIME DIFF Is: ", diff);
+
+
+    if (diff < 3000) {
+      return res.status(400).json({
+        ok: false,
+        message: `Wait ${Math.ceil((3000 - diff) / 1000)} sec(s) before cash-in`
+      });
+    }
+
+    bet.status = "LOCKED";
+    await bet.save();
+
+    return res.status(200).json({ ok: true, message: "Cashed In" });
+  } catch (error) {
+    console.error("cashInAviator error:", error.message);
+    return res.status(500).json({ ok: false, message: "Cannot Cash In!" });
+  }
+};

@@ -20,8 +20,8 @@ function initAviator(io, tableId = 'table-1') {
                 await settleRoundTx({
                     roundId,
                     game: GAME,
-                    outcome: { multiplier: multiplier },
-                    meta: multiplier,
+                    outcome: { firstOutcome: multiplier },
+                    meta: {multiplier},
                 });
             }
         }
