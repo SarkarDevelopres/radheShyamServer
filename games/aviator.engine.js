@@ -247,9 +247,8 @@ class AviatorEngine {
                 const data = await fetchBalance(sock.userID);
                 sock.emit("wallet:update", { ok: true, ...data });
             }));
-
+            this.io.to(this.roomKey()).emit('round:end', { message: "Round Ended" });
             setTimeout(async () => {
-                this.io.to(this.roomKey()).emit('round:end', { message: "Round Ended" });
                 this._endEmitted = true;
                 if (this.running) {
                     setImmediate(() => this.nextRound().catch(console.error));

@@ -93,7 +93,7 @@ const computeAndarBaharNaturalResult = (roundId) => {
     let joker = jokerCache.get(rid);
     // console.log("Joker Called during Calculations: ", joker);
 
-    let deckWithoutJoker = deck.filter(d => !(d.rank === joker.rank && d.suit === joker.suit))
+    let deckWithoutJoker = deck.filter(d => !(d.rank === joker?.rank && d.suit === joker?.suit))
     let i = 0;
     let andarWins, baharWins;
     do {
