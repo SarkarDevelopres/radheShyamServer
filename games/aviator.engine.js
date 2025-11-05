@@ -81,6 +81,7 @@ class AviatorEngine {
         this._checkAt = 0;
         this._crashAt = 0;
         this._endAt = 0;
+        this._startAt = 0;
 
         // idempotent guards
         this._crashEmitted = false;
@@ -172,6 +173,8 @@ class AviatorEngine {
         }
         if (round) {
 
+            this._startAt = startAtEpoch;
+
             if (this._tickInterval || this._tickT) {
                 console.warn("⚠️ Overlapping round detected, clearing timers...");
                 this._clearTimers();
@@ -229,7 +232,7 @@ class AviatorEngine {
     }
 
     async crash() {
-        console.log(">>> Crashed at at", Date.now() - startAtEpoch, "ms since round start");
+        console.log(">>> Crashed at at", Date.now() - this._startAt, "ms since round start");
         if (this._crashEmitted) return;
         this._crashEmitted = true;
         try {
