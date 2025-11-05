@@ -184,7 +184,7 @@ class RoundEngine {
 
         this.viewers = generateRandomNo();
         const resultList = await fetchLast5RoundsResult(this.game);
-        console.log(`Last 5 results for ${this.game}: `, resultList);
+        // console.log(`Last 5 results for ${this.game}: `, resultList);
 
         const viewrSnap = { ...snap, viewers: this.viewers, resultList };
         this.io.to(this.roomKey()).emit('round:start', viewrSnap);

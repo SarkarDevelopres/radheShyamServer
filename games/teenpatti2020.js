@@ -210,10 +210,10 @@ const marketKeys = [
 ];
 
 async function checkWorstMarket(roundId) {
-    console.log('ROund Id: ', roundId);
+    // console.log('ROund Id: ', roundId);
     
     const bets = await Bet.find({ roundId, type: "casino", status: "OPEN" });
-    console.log('Bets are: ', bets);
+    // console.log('Bets are: ', bets);
 
     // // Aggregate totals
     const totals = {};
@@ -239,7 +239,7 @@ async function checkWorstMarket(roundId) {
 
 async function computeBiasedResult(roundId) {
     let worst = await checkWorstMarket(roundId);
-    console.log("WORST IS: ",worst);
+    // console.log("WORST IS: ",worst);
     
     let { playerA, playerB, winner } = resultCache.get(roundId);
     let currentDeck = deckCache.get(roundId);

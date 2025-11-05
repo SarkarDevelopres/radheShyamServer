@@ -70,7 +70,7 @@ async function computeAndarBaharResult(roundId, joker) {
             let lowSuitName = worstSuit.toLowerCase();
             if (isColorBet) {
                 const blockedSuits = worstSuit === "RED" ? RED_SUITS : BLACK_SUITS;
-                console.log("BLOCKED SUITS: ",blockedSuits);
+                // console.log("BLOCKED SUITS: ",blockedSuits);
                 
                 if (worstSide === "ANDAR") andarSuits = SUITS.filter(s => !blockedSuits.includes(s));
                 if (worstSide === "BAHAR") baharSuits = SUITS.filter(s => !blockedSuits.includes(s));
@@ -148,7 +148,7 @@ function initAndarBahar(io, tableId = "table-1") {
                 const round = await createRound(payload);
                 const rid = String(round?._id || Date.now()); // fallback unique key
                 lastRoundId = rid;
-                console.log(round._id);
+                // console.log(round._id);
 
 
                 const joker = makeCard(pick(RANKS), pick(SUITS));
@@ -175,7 +175,7 @@ function initAndarBahar(io, tableId = "table-1") {
             onComputeResult: async() => {
                 // roundId missing? use lastRoundId
                 const key = lastRoundId ? String(lastRoundId) : null;
-                console.log("[AndarBahar] Using key:", key);
+                // console.log("[AndarBahar] Using key:", key);
                 let result = engine._preResults.get(key);
                 // console.log("RESULT: ",result);
                 

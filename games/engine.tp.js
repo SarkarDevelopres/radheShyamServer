@@ -118,7 +118,7 @@ class TeenpattiEngine {
 
   cardEmittor() {
     this.io.to(this.roomKey()).emit('round:revealDeck', this.result);
-    console.log("Card Emit Event: ", this.result);
+    // console.log("Card Emit Event: ", this.result);
   }
 
   // ----- PHASES -----
@@ -126,7 +126,7 @@ class TeenpattiEngine {
 
   async nextRound() {
     if (!this.running) return;
-    console.log("NEW ROUND");
+    // console.log("NEW ROUND");
 
 
     // reset phases
@@ -164,7 +164,7 @@ class TeenpattiEngine {
       this.viewers = generateRandomNo();
       const resultList = await fetchLast5RoundsResult(this.game);
       let finalSnap = { ...round, viewers: this.viewers, resultList };
-      console.log(finalSnap);
+      // console.log(finalSnap);
       
 
       this.io.to(this.roomKey()).emit('round:start', finalSnap);

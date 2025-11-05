@@ -138,8 +138,6 @@ class AviatorEngine {
 
     async nextRound() {
         if (!this.running) return;
-        console.log("NEW ROUND");
-
 
         // reset phases
         this._crashEmitted = false;
@@ -188,12 +186,12 @@ class AviatorEngine {
 
             this.round = round;
             this.id = String(round._id)
-            console.log("Round stored in engine: ", round);
+            // console.log("Round stored in engine: ", round);
 
             this.viewers = generateRandomNo();
             let finalSnap = { ...round._doc, viewers: this.viewers, multiplier: this.multiplier };
-            console.log("Final Snap: ",finalSnap);
-            
+            // console.log("Final Snap: ", finalSnap);
+
 
             this.io.to(this.roomKey()).emit('round:start', finalSnap);
         }
@@ -231,8 +229,7 @@ class AviatorEngine {
     }
 
     async crash() {
-        console.log("CRASHED !!");
-
+        console.log(">>> Crashed at at", Date.now() - startAtEpoch, "ms since round start");
         if (this._crashEmitted) return;
         this._crashEmitted = true;
         try {

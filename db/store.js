@@ -258,9 +258,6 @@ async function placeBetTx({ userId, game, tableId, roundId, market, stake }) {
 // ---------- sports bet placement (HTTP route) ----------
 async function placeSportsBetTx({ userId, eventId, market, selection, selectionName, stake, odds, lay, deductAmount }) {
   // console.log("USerID: u", userId);
-  console.log("✅ placeSportsBetTx executing with deductAmount:", deductAmount);
-
-
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
@@ -270,8 +267,6 @@ async function placeSportsBetTx({ userId, eventId, market, selection, selectionN
       throw new Error(`Invalid deductAmount (${deductAmount})`);
     }
     const amountToDeduct = rawDeduct;
-    console.log("SELECTION TEAM: ", selectionName);
-
     const u = await User.findOneAndUpdate(
       { _id: userId, balance: { $gte: amountToDeduct } },
       { $inc: { balance: -amountToDeduct, exp: -amountToDeduct } },
@@ -636,7 +631,6 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
 
       for (const b of bets) {
         const pick = normalize(b.market); // e.g., 'ANDAR', 'BAHAR'
-        console.log("PICK: ", pick);
 
         let andarGroup = (['hearts', 'diamonds'].includes(outcome?.andar.suit)) ? 'ANDAR_RED' : 'ANDAR_BLACK';
         let baharGroup = (['hearts', 'diamonds'].includes(outcome?.bahar.suit)) ? 'BAHAR_RED' : 'BAHAR_BLACK';
@@ -796,8 +790,6 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
         });
 
         if (payout > 0) {
-          console.log("I am called");
-
           walletIncs.push({
             updateOne: { filter: { _id: b.userId }, update: { $inc: { balance: payout } } },
           });
@@ -820,12 +812,8 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
 
     if (txDocs.length) await Transaction.insertMany(txDocs, { session });
 
-    console.log(roundDocs);
-
     if (roundDocs.length) {
       let changedRounds = await Round.bulkWrite(roundDocs);
-      console.log(changedRounds);
-
     }
 
     // 5) Mark round settled + store outcome/meta/summary
