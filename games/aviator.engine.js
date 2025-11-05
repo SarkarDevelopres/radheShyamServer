@@ -1,5 +1,6 @@
 const Bet = require("../db/models/bet");
 const { fetchBalance } = require("../db/store");
+const Round = require("../db/models/round");
 
 const generateRandomNo = () => {
     let randomViewer = Math.floor(Math.random() * 66) + 10
@@ -17,6 +18,18 @@ const generateRandomWinnerLoser = (viewers) => {
 function generateRandomRoundTIme() {
     const seconds = Math.random() * (20 - 8) + 8;
     return seconds.toFixed(2) * 1000;
+}
+
+const fetchLast5RoundsResult = async (game_name) => {
+  let resultData = await Round.find({ game: game_name })
+    .sort({ createdAt: -1 })
+    .skip(1)
+    .limit(5)
+    .select('result status -_id');
+
+  let finalResultList = resultData.reverse().map(r => r.result?.winner);
+
+  return finalResultList;
 }
 
 const random = (min, max) => Math.random() * (max - min) + min;
@@ -167,6 +180,7 @@ class AviatorEngine {
             status: 'OPEN',
         };
         const round = await this.hooks.onCreateRound(payload);
+        let resultList = await fetchLast5RoundsResult(this.game);
         if (!round) {
             console.log(`ROUND CREATION FAILED FOR ${this.game}. RETRYING...`);
             return setTimeout(() => this.nextRound(), 500);
@@ -192,7 +206,7 @@ class AviatorEngine {
             // console.log("Round stored in engine: ", round);
 
             this.viewers = generateRandomNo();
-            let finalSnap = { ...round._doc, viewers: this.viewers, multiplier: this.multiplier };
+            let finalSnap = { ...round._doc, viewers: this.viewers, multiplier: this.multiplier, result:resultList };
             // console.log("Final Snap: ", finalSnap);
 
 
@@ -236,9 +250,9 @@ class AviatorEngine {
         if (this._crashEmitted) return;
         this._crashEmitted = true;
         try {
+            this._clearTimers();
             this.io.to(this.roomKey()).emit('aviator:crash', { message: "Crashed" });
             await this.hooks.onEndRound(this.id, this.multiplier);
-            this._clearTimers();
             this.multiplier = 1;
 
             const sockets = await this.io.fetchSockets();

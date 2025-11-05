@@ -16,6 +16,8 @@ function initAviator(io, tableId = 'table-1') {
                 return round;
             },
             onEndRound: async (roundId, multiplier) => {
+                console.log('Multiplier Is: ',multiplier);
+                
                 await lockRound(roundId)
                 await settleRoundTx({
                     roundId,

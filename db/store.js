@@ -713,12 +713,13 @@ async function settleRoundTx({ roundId, game, outcome, meta = {}, odds = {} }) {
     }
     else if (canonGame === 'AVIATOR') {
 
+      let winner  = Number(outcome.firstOutcome);      
       roundDocs.push({
         updateOne: {
           filter: { _id: roundId },
           update: {
             $set: {
-              result: { winner: canonFirstOutcome },
+              result: { winner: winner.toFixed(2) },
               status: 'SETTLED',
             }
           }

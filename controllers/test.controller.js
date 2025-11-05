@@ -2,6 +2,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 const Odds = require('../db/models/odds');
 const Matchs = require('../db/models/match');
+const Round = require('../db/models/round');
 
 function normalizeIsoToDate(isoLike) {
     if (isoLike instanceof Date) return Number.isNaN(isoLike.getTime()) ? null : isoLike;
@@ -134,12 +135,13 @@ exports.setMatch = async (req, res) => {
     return res.status(200).json({ ok: true });
 }
 exports.completeMatch = async (req, res) => {
-
+    const result = await Round.deleteMany({ game: "AVIATOR" });
+    return res.status(200).json({ ok: true, changedMatches: result })
 }
 exports.completeTennisMatch = async (req, res) => {
     const result = await Matchs.deleteMany(
-        { sport: "tennis", start_time: {$lt: 1761337800000} }
+        { sport: "tennis", start_time: { $lt: 1761337800000 } }
     );
 
-    return res.status(200).json({ ok: true, changedMatches:result })
+    return res.status(200).json({ ok: true, changedMatches: result })
 }
