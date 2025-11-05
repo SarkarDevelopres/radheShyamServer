@@ -209,7 +209,7 @@ async function checkWorstMarket(roundId) {
 
 async function computeBiasedResult(roundId) {
     let worst = await checkWorstMarket(roundId);
-    console.log("WORST IS: ", worst);
+    // console.log("WORST IS: ", worst);
 
     let { playerA, playerB, winner } = resultCache.get(roundId);
     let currentDeck = deckCache.get(roundId);
